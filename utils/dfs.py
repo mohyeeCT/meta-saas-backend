@@ -1,0 +1,418 @@
+import requests
+import base64
+
+DFS_BASE = "https://api.dataforseo.com/v3"
+
+
+def _auth_header(login: str, password: str) -> dict:
+    token = base64.b64encode(f"{login}:{password}".encode()).decode()
+    return {
+        "Authorization": f"Basic {token}",
+        "Content-Type": "application/json"
+    }
+
+
+def get_keyword_overview(login: str, password: str, keywords: list, location_code: int = 2840) -> dict:
+    """Returns dict keyed by lowercase keyword: {volume, cpc, competition}."""
+    if not keywords:
+        return {}
+    payload = [{"keywords": keywords, "location_code": location_code, "language_code": "en"}]
+    try:
+        r = requests.post(
+            f"{DFS_BASE}/keywords_data/google_ads/search_volume/live",
+            headers=_auth_header(login, password),
+            json=payload,
+            timeout=30
+        )
+        r.raise_for_status()
+        data = r.json()
+        result = {}
+        for task in data.get("tasks", []):
+            for item in (task.get("result") or []):
+                kw = item.get("keyword", "").lower()
+                result[kw] = {
+                    "volume": item.get("search_volume", 0) or 0,
+                    "cpc": item.get("cpc", 0),
+                    "competition": item.get("competition", 0)
+                }
+        return result
+    except Exception:
+        return {}
+
+
+def get_keyword_difficulty(login: str, password: str, keywords: list, location_code: int = 2840) -> dict:
+    """Returns dict keyed by lowercase keyword: {difficulty}."""
+    if not keywords:
+        return {}
+    payload = [{"keywords": keywords, "location_code": location_code, "language_code": "en"}]
+    try:
+        r = requests.post(
+            f"{DFS_BASE}/dataforseo_labs/google/bulk_keyword_difficulty/live",
+            headers=_auth_header(login, password),
+            json=payload,
+            timeout=30
+        )
+        r.raise_for_status()
+        data = r.json()
+        result = {}
+        for task in data.get("tasks", []):
+            for item in (task.get("result") or []):
+                for kw_item in (item.get("items") or []):
+                    kw = kw_item.get("keyword", "").lower()
+                    result[kw] = {
+                        "difficulty": kw_item.get("keyword_difficulty", 50) or 50
+                    }
+        return result
+    except Exception:
+        return {}
+
+
+
+def _extract_ai_overview_text(item: dict) -> str:
+    """Extract AI Overview text from a DFS SERP item.
+
+    Mirrors the SF script approach: no assumptions about block.type,
+    just pull text from wherever it exists in the response.
+
+    Priority order:
+    1. item.items[].text  (structured blocks)
+    2. item.text          (flat text field)
+    3. item.markdown      (markdown fallback for async overviews)
+    """
+    if not item:
+        return ""
+
+    # 1. Try structured items array — map each block's text field
+    blocks = item.get("items") or []
+    if blocks:
+        parts = []
+        for block in blocks:
+            txt = ""
+            if isinstance(block, dict):
+                txt = (
+                    block.get("text", "")
+                    or block.get("content", "")
+                    or ""
+                ).strip()
+            if txt:
+                parts.append(txt)
+        combined = "\n\n".join(parts)
+        if combined:
+            return combined
+
+    # 2. Try flat text field on the item itself
+    flat = (item.get("text") or "").strip()
+    if flat:
+        return flat
+
+    # 3. Try markdown field — present on some async AI Overview responses
+    markdown = (item.get("markdown") or "").strip()
+    if markdown:
+        # Strip markdown syntax to plain text
+        import re
+        markdown = re.sub(r"!\[([^\]]*)\]\((https?://[^\)]+)\)", r"\1", markdown)
+        markdown = re.sub(r"\[([^\]]+)\]\((https?://[^\)]+)\)", r"\1", markdown)
+        markdown = re.sub(r"https?://\S+", "", markdown)
+        markdown = re.sub(r"\*+", "", markdown)
+        markdown = re.sub(r"#+\s*", "", markdown)
+        markdown = re.sub(r"\s+", " ", markdown).strip()
+        if markdown:
+            return markdown
+
+    return ""
+
+
+
+def _extract_paa_answer(paa_el: dict) -> str:
+    """Extract answer text from a PAA element, handling all known expanded_element types.
+
+    Covers:
+    - people_also_ask_expanded_element  (standard text answer)
+    - people_also_ask_ai_overview_expanded_element  (AIO-style answer)
+    - video elements  (use title as fallback)
+    - table/list elements  (flatten to text)
+    - any unknown type  (try all known text fields)
+    """
+    answer_source = (
+        paa_el.get("expanded_element") or
+        paa_el.get("items") or
+        []
+    )
+
+    for el in answer_source:
+        if not isinstance(el, dict):
+            continue
+
+        el_type = el.get("type", "")
+
+        # Standard text answer
+        if el_type == "people_also_ask_expanded_element":
+            answer = (
+                el.get("description", "")
+                or el.get("text", "")
+                or el.get("snippet", "")
+                or el.get("featured_title", "")
+                or ""
+            ).strip()
+            if answer:
+                return answer
+
+        # AI Overview style answer — flatten items[].text
+        elif el_type == "people_also_ask_ai_overview_expanded_element":
+            parts = []
+            for sub in (el.get("items") or []):
+                txt = (sub.get("text", "") or sub.get("content", "") or "").strip()
+                if txt:
+                    parts.append(txt)
+            answer = " ".join(parts).strip()
+            if answer:
+                return answer
+
+        # Video answer — use description or title as fallback text
+        elif el_type in ("video", "youtube_video"):
+            answer = (
+                el.get("description", "")
+                or el.get("title", "")
+                or ""
+            ).strip()
+            if answer:
+                return answer
+
+        # Table answer — flatten rows to readable text
+        elif el_type == "table":
+            rows = el.get("table_element", {}).get("rows", []) if isinstance(el.get("table_element"), dict) else []
+            cells = []
+            for row in rows:
+                for cell in (row.get("cells") or []):
+                    txt = (cell.get("text", "") or "").strip()
+                    if txt:
+                        cells.append(txt)
+            answer = ", ".join(cells[:8])
+            if answer:
+                return answer
+
+        # List answer — join items
+        elif el_type in ("list", "ordered_list", "unordered_list"):
+            items_list = el.get("items") or []
+            parts = []
+            for li in items_list:
+                txt = (li.get("text", "") or li.get("title", "") or "").strip()
+                if txt:
+                    parts.append(txt)
+            answer = "; ".join(parts[:6])
+            if answer:
+                return answer
+
+        # Unknown type — try every known text field
+        else:
+            answer = (
+                el.get("description", "")
+                or el.get("text", "")
+                or el.get("snippet", "")
+                or el.get("featured_title", "")
+                or el.get("title", "")
+                or ""
+            ).strip()
+            if answer:
+                return answer
+
+    # Nothing found in expanded_element — try top-level fields on paa_el itself
+    return (
+        paa_el.get("description", "")
+        or paa_el.get("snippet", "")
+        or paa_el.get("answer", "")
+        or ""
+    ).strip()
+
+
+
+def get_serp_data(login: str, password: str, keyword: str, location_code: int = 2840, load_async_ai_overview: bool = True) -> dict:
+    """Single SERP call that returns both AI Overview and PAA data.
+
+    Returns:
+    {
+        "ai_overview_present": bool,
+        "ai_overview_sections": [{"title": str, "content": str}, ...],
+        "ai_overview_raw": str,          # full concatenated AI overview text
+        "paa_questions": [str, ...],     # PAA question strings
+        "paa_items": [{"question": str, "answer": str, "url": str}, ...]
+    }
+    """
+    empty = {
+        "ai_overview_present": False,
+        "ai_overview_async_only": False,
+        "ai_overview_sections": [],
+        "ai_overview_raw": "",
+        "paa_questions": [],
+        "paa_items": [],
+        "serp_item_types": [],
+        "paa_raw_debug": "",
+        "ao_raw_debug": "",
+        "ao_raw_found": False,
+        "ao_attempts": 0,
+    }
+
+    if not keyword:
+        return empty
+
+    payload = [{
+        "keyword": keyword,
+        "location_code": location_code,
+        "language_code": "en",
+        "depth": 10,
+        "people_also_ask_click_depth": 4,
+        "device": "desktop",
+        "os": "macos",
+        "load_async_ai_overview": load_async_ai_overview,
+    }]
+
+    # 3 attempts max — gives the async AI Overview a fair chance to load
+    # without the original 5-attempt × 3s = 15s wasted sleep per URL
+    max_attempts = 3
+    last_error = None
+
+    for attempt in range(1, max_attempts + 1):
+      try:
+        r = requests.post(
+            f"{DFS_BASE}/serp/google/organic/live/advanced",
+            headers=_auth_header(login, password),
+            json=payload,
+            timeout=45
+        )
+        r.raise_for_status()
+        data = r.json()
+
+        ai_sections = []
+        ai_raw_parts = []
+        paa_questions = []
+        paa_items = []
+        paa_raw_items = []
+        ao_raw_items = []
+
+        for task in data.get("tasks", []):
+            for result_block in (task.get("result") or []):
+                for item in (result_block.get("items") or []):
+                    item_type = item.get("type", "")
+
+                    # ── AI Overview ──────────────────────────────────────────
+                    if item_type in ("ai_overview", "asynchronous_ai_overview"):
+                        ao_raw_items.append(item)
+                        ao_text = _extract_ai_overview_text(item)
+                        if ao_text:
+                            ai_sections.append({"title": "", "content": ao_text})
+                            ai_raw_parts.append(ao_text)
+
+                    # ── PAA ──────────────────────────────────────────────────
+                    if item_type == "people_also_ask":
+                        paa_raw_items.append(item)
+                        for paa_el in (item.get("items") or []):
+                            # DFS uses "title" for the question text,
+                            # but fall back to other fields defensively
+                            q = (
+                                paa_el.get("title", "")
+                                or paa_el.get("question", "")
+                                or paa_el.get("name", "")
+                                or paa_el.get("text", "")
+                            ).strip()
+                            if not q or q in paa_questions:
+                                continue
+                            paa_questions.append(q)
+                            answer = _extract_paa_answer(paa_el)
+                            paa_items.append({
+                                "question": q,
+                                "answer": answer,
+                                "url": paa_el.get("url", "")
+                            })
+
+        # Collect all item types for debugging
+        all_item_types = []
+        for task in data.get("tasks", []):
+            for result_block in (task.get("result") or []):
+                for item in (result_block.get("items") or []):
+                    t = item.get("type", "unknown")
+                    if t not in all_item_types:
+                        all_item_types.append(t)
+
+        async_ao_detected = "asynchronous_ai_overview" in all_item_types
+        ao_found = len(ai_sections) > 0
+
+        result = {
+            "ai_overview_present": ao_found,
+            "ai_overview_async_only": async_ao_detected and not ao_found,
+            "ai_overview_sections": ai_sections,
+            "ai_overview_raw": "\n".join(ai_raw_parts),
+            "paa_questions": paa_questions,
+            "paa_items": paa_items,
+            "serp_item_types": all_item_types,
+            "paa_raw_debug": str(paa_raw_items[:1])[:500] if paa_raw_items else "",
+            "ao_raw_debug": str(ao_raw_items[:1])[:800] if ao_raw_items else "",
+            "ao_raw_found": len(ao_raw_items) > 0,
+            "ao_attempts": attempt,
+        }
+
+        # AI Overview found — no need to retry
+        if ao_found:
+            return result
+
+        # No AI Overview content yet — retry if attempts remain
+        if attempt < max_attempts:
+            import time as _time
+            _time.sleep(1.5)
+            continue
+
+        # Exhausted all attempts — return best result so far
+        return result
+
+      except Exception as e:
+        last_error = str(e)
+        if attempt < max_attempts:
+            import time as _time
+            _time.sleep(1.5)
+            continue
+        result = empty.copy()
+        result["error"] = last_error
+        result["ao_attempts"] = attempt
+        return result
+
+
+def get_serp_data_with_interrogative_fallback(
+    login: str, password: str, keyword: str,
+    location_code: int = 2840,
+    load_async_ai_overview: bool = True,
+) -> dict:
+    """
+    Calls get_serp_data for the keyword. If both AIO and PAA come back empty,
+    tries interrogative prefixes (what, how, why) in order until one returns
+    PAA or AIO data. Returns the best result found.
+
+    The fallback_query field in the result indicates which query triggered data,
+    or is empty if the original keyword returned results.
+    """
+    result = get_serp_data(login, password, keyword, location_code, load_async_ai_overview)
+    result["fallback_query"] = ""
+
+    ao_empty = not result.get("ai_overview_sections") and not result.get("ai_overview_raw", "").strip()
+    paa_empty = not result.get("paa_items")
+
+    if not (ao_empty and paa_empty):
+        # Original keyword had data — no fallback needed
+        return result
+
+    # Both empty — try interrogative prefixes in priority order
+    prefixes = ["what", "how", "why"]
+    for prefix in prefixes:
+        fallback_kw = f"{prefix} {keyword}"
+        try:
+            fb = get_serp_data(login, password, fallback_kw, location_code, load_async_ai_overview)
+            fb_ao_empty = not fb.get("ai_overview_sections") and not fb.get("ai_overview_raw", "").strip()
+            fb_paa_empty = not fb.get("paa_items")
+
+            if not fb_ao_empty or not fb_paa_empty:
+                # This prefix triggered data — use it, tag the fallback query
+                fb["fallback_query"] = fallback_kw
+                return fb
+        except Exception:
+            continue
+
+    # No interrogative prefix returned data — return original empty result
+    return result
