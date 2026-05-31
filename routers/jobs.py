@@ -33,7 +33,7 @@ def list_jobs(user=Depends(get_current_user)):
         sb.table("jobs")
         .select("id, name, status, total_rows, completed_rows, failed_rows, created_at, updated_at, error")
         .eq("user_id", user.id)
-        .eq("tool", "faq")
+        .eq("tool", "meta")
         .order("created_at", desc=True)
         .limit(50)
         .execute()
