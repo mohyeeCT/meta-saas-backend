@@ -1,7 +1,7 @@
 import anthropic
 import openai
 from google import genai as google_genai
-from mistralai.client import Mistral
+from mistralai import Mistral
 from groq import Groq
 
 
