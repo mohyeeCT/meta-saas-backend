@@ -9,6 +9,7 @@ from auth import get_supabase
 from utils.gsc import get_gsc_client, get_top_queries_for_url
 from utils.dfs import get_keyword_overview, get_keyword_difficulty
 from utils.keyword import select_keyword
+from utils.niches import get_niche_context
 from utils.copy_gen import generate_copy
 
 router = APIRouter()
@@ -180,6 +181,10 @@ def _process_single_row(
             parts.append(brand_profile["guidelines"])
         brand_guidelines = "\n".join(parts)
 
+    _niche_ctx = get_niche_context(settings.get("niche", ""))
+    if _niche_ctx:
+        brand_guidelines = (brand_guidelines + "\n\n" + _niche_ctx).strip()
+
     try:
         copy = generate_copy(
             provider=settings.get("provider", "Claude"),
@@ -326,6 +331,7 @@ class MetaRow(BaseModel):
 
 
 class MetaSettings(BaseModel):
+    niche: str = ""
     provider: str = "Claude"
     api_key: str = ""
     dfs_login: str = ""

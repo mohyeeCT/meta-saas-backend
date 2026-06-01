@@ -227,3 +227,10 @@ def delete_brand_profile(profile_id: str, user=Depends(get_current_user)):
     sb = get_supabase()
     sb.table("brand_profiles").delete().eq("id", profile_id).eq("user_id", user.id).execute()
     return {"deleted": True}
+
+
+@router.get("/niches")
+def list_niches():
+    """Return all available niches for the frontend dropdown."""
+    from utils.niches import get_niche_options
+    return get_niche_options()
