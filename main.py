@@ -28,3 +28,22 @@ app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    """Inject CORS headers on unhandled 500s.
+    Railway EU edge strips CORS from 500 responses, causing misleading
+    CORS errors in DevTools that mask the real server error."""
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+        headers={
+            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            "Access-Control-Allow-Credentials": "true",
+        },
+    )
