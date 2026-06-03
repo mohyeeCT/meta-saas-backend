@@ -40,3 +40,24 @@ create policy "Users can only access their own settings"
   on public.user_settings for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+
+-- Brand profiles table: named sets of tone/messaging used across all tools
+create table if not exists public.brand_profiles (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid references auth.users not null,
+  name        text not null,
+  data        jsonb default '{}',
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+
+alter table public.brand_profiles enable row level security;
+
+create policy "Users can only access their own brand profiles"
+  on public.brand_profiles for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create index if not exists brand_profiles_user_id_idx on public.brand_profiles (user_id);
+
