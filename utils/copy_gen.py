@@ -30,6 +30,39 @@ def _sanitise(text: str, brand_name: str = "") -> str:
     return text.strip()
 
 
+UNSUPPORTED_CLAIM_GUARDRAIL = """
+Unsupported claim guardrail:
+- Do not state or imply return, shipping, delivery, warranty, guarantee, refund,
+  exchange, eligibility, availability, stock, pricing, discount, certification,
+  compliance, safety, legal, medical, or performance claims unless they are
+  explicitly present in the provided page or brand context.
+- Treat business type, niche, keyword, H1, and CTA examples as strategy signals,
+  not proof for factual claims.
+- If a risky claim would normally be expected, keep the wording general and avoid
+  unsupported specifics.
+""".strip()
+
+
+def _fit_to_limit(text: str, limit: int) -> str:
+    """Trim generated copy to a hard character limit without splitting words."""
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+
+    trimmed = text[:limit].rstrip()
+    if " " in trimmed:
+        trimmed = trimmed.rsplit(" ", 1)[0].rstrip()
+    return trimmed.rstrip(" ,;:-|")
+
+
+def _normalise_copy_result(result: dict, brand_name: str = "") -> dict:
+    return {
+        "title": _fit_to_limit(_sanitise(result.get("title", ""), brand_name), 60),
+        "description": _fit_to_limit(_sanitise(result.get("description", ""), brand_name), 155),
+        "h1_optimised": _sanitise(result.get("h1_optimised", ""), brand_name),
+    }
+
+
 # Business type guidance injected into prompts
 BUSINESS_TYPE_CONTEXT = {
     "b2b": {
@@ -119,6 +152,8 @@ Page details:
 - Forbidden phrases: {forbidden_phrases}
 - Additional context: {context}
 
+{unsupported_claim_guardrail}
+
 Important: The H1 tells you the current page topic. Use it to ensure the title tag reflects the actual page content and differentiates product variations from each other."""
 
 
@@ -153,6 +188,8 @@ Page details:
 - Forbidden phrases: {forbidden_phrases}
 - Additional context: {context}
 
+{unsupported_claim_guardrail}
+
 Important: The H1 tells you the current page topic. Use it to write a description that accurately reflects the page content and stands out from similar pages on the same site."""
 
 
@@ -183,6 +220,8 @@ Page details:
 - Forbidden phrases: {forbidden_phrases}
 - Additional context: {context}
 
+{unsupported_claim_guardrail}
+
 Important: The current H1 shows what topic the page covers. Your job is to improve it by making it more specific, keyword-focused, and aligned with what the target buyer is searching for. Do not produce the same H1 unless it is already optimal."""
 
 def _build_prompt(template: str, url: str, keyword: str, page_type: str,
@@ -205,7 +244,8 @@ def _build_prompt(template: str, url: str, keyword: str, page_type: str,
         cta_examples=bcontext["cta_examples"],
         avoid=bcontext["avoid"],
         title_pattern=bcontext["title_pattern"],
-        desc_pattern=bcontext["desc_pattern"]
+        desc_pattern=bcontext["desc_pattern"],
+        unsupported_claim_guardrail=UNSUPPORTED_CLAIM_GUARDRAIL,
     )
 
 
@@ -306,4 +346,4 @@ def generate_copy(provider: str, api_key: str, **kwargs) -> dict:
     fn = PROVIDERS.get(provider)
     if not fn:
         raise ValueError(f"Unknown provider: {provider}")
-    return fn(api_key, **kwargs)
+    return _normalise_copy_result(fn(api_key, **kwargs), kwargs.get("brand_name", ""))
