@@ -1,3 +1,4 @@
+import json
 import anthropic
 import openai
 from google import genai as google_genai
@@ -60,6 +61,7 @@ def _normalise_copy_result(result: dict, brand_name: str = "") -> dict:
         "title": _fit_to_limit(_sanitise(result.get("title", ""), brand_name), 60),
         "description": _fit_to_limit(_sanitise(result.get("description", ""), brand_name), 155),
         "h1_optimised": _sanitise(result.get("h1_optimised", ""), brand_name),
+        "review_notes": _sanitise(result.get("review_notes", ""), brand_name),
     }
 
 
@@ -224,6 +226,51 @@ Page details:
 
 Important: The current H1 shows what topic the page covers. Your job is to improve it by making it more specific, keyword-focused, and aligned with what the target buyer is searching for. Do not produce the same H1 unless it is already optimal."""
 
+
+COPY_PROMPT = """You are a senior SEO copywriter with deep knowledge of how different business types require different copy strategies.
+
+Write one title tag, one meta description, and one optimised H1 for the following page.
+
+Hard rules:
+- Title maximum 60 characters. Count carefully. This is a strict limit.
+- Meta description maximum 155 characters. Count carefully. This is a strict limit.
+- H1 has no hard character limit but should aim for under 70 characters.
+- Include the target keyword naturally, ideally near the start where it fits.
+- No all-caps, excessive punctuation, or clickbait.
+- No padding or filler words.
+- Never use em dashes anywhere in the output.
+- If brand name is provided, append it to the title after a pipe character.
+- Use the brand name EXACTLY as provided, preserving capitalisation and full name.
+- Do not duplicate the title tag, meta description, and H1.
+- Return ONLY a raw JSON object with keys: title, description, h1_optimised, review_notes.
+
+{unsupported_claim_guardrail}
+
+Business context:
+- Business type: {business_type}
+- Target buyer: {buyer}
+- Buyer intent: {intent}
+- Recommended tone: {tone}
+- Good CTA examples for this type: {cta_examples}
+- Recommended title pattern: {title_pattern}
+- Recommended description pattern: {desc_pattern}
+- Avoid: {avoid}
+
+Page details:
+- URL: {url}
+- Page type: {page_type}
+- Target keyword: {keyword}
+- Brand name: {brand_name}
+- Current H1: {h1}
+- Forbidden phrases: {forbidden_phrases}
+- Additional context: {context}
+
+Review notes:
+- If output avoids or softens a risky unsupported claim, explain that briefly in review_notes.
+- If output is clean, use an empty string for review_notes.
+"""
+
+
 def _build_prompt(template: str, url: str, keyword: str, page_type: str,
                   brand_name: str, forbidden_phrases: str, context: str,
                   business_type: str = "general", h1: str = "") -> str:
@@ -249,6 +296,34 @@ def _build_prompt(template: str, url: str, keyword: str, page_type: str,
     )
 
 
+def _parse_copy_json(raw: str) -> dict:
+    raw = (raw or "").strip()
+    import re
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```\s*$", "", raw)
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ValueError("AI response must be a JSON object")
+    return data
+
+
+def _call_and_normalise(call_fn, url: str, keyword: str, page_type: str,
+                        brand_name: str, forbidden_phrases: str, context: str,
+                        business_type: str, h1: str) -> dict:
+    prompt = _build_prompt(
+        COPY_PROMPT,
+        url=url,
+        keyword=keyword,
+        page_type=page_type,
+        brand_name=brand_name,
+        forbidden_phrases=forbidden_phrases,
+        context=context,
+        business_type=business_type,
+        h1=h1,
+    )
+    return _normalise_copy_result(_parse_copy_json(call_fn(prompt)), brand_name)
+
+
 # ── Claude ────────────────────────────────────────────────────────────────────
 def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = "general",
                          brand_name: str = "", forbidden_phrases: str = "", context: str = "",
@@ -263,7 +338,7 @@ def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = 
         )
         return msg.content[0].text.strip()
 
-    return {"title": _sanitise(call(TITLE_PROMPT), brand_name), "description": _sanitise(call(DESCRIPTION_PROMPT), brand_name), "h1_optimised": _sanitise(call(H1_PROMPT))}
+    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)
 
 
 # ── OpenAI ────────────────────────────────────────────────────────────────────
@@ -280,7 +355,7 @@ def generate_copy_openai(api_key: str, url: str, keyword: str, page_type: str = 
         )
         return resp.choices[0].message.content.strip()
 
-    return {"title": _sanitise(call(TITLE_PROMPT), brand_name), "description": _sanitise(call(DESCRIPTION_PROMPT), brand_name), "h1_optimised": _sanitise(call(H1_PROMPT))}
+    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)
 
 
 # ── Gemini ────────────────────────────────────────────────────────────────────
@@ -296,7 +371,7 @@ def generate_copy_gemini(api_key: str, url: str, keyword: str, page_type: str = 
         )
         return resp.text.strip()
 
-    return {"title": _sanitise(call(TITLE_PROMPT), brand_name), "description": _sanitise(call(DESCRIPTION_PROMPT), brand_name), "h1_optimised": _sanitise(call(H1_PROMPT))}
+    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)
 
 
 # ── Mistral ───────────────────────────────────────────────────────────────────
@@ -313,7 +388,7 @@ def generate_copy_mistral(api_key: str, url: str, keyword: str, page_type: str =
         )
         return resp.choices[0].message.content.strip()
 
-    return {"title": _sanitise(call(TITLE_PROMPT), brand_name), "description": _sanitise(call(DESCRIPTION_PROMPT), brand_name), "h1_optimised": _sanitise(call(H1_PROMPT))}
+    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)
 
 
 # ── Groq ──────────────────────────────────────────────────────────────────────
@@ -330,7 +405,7 @@ def generate_copy_groq(api_key: str, url: str, keyword: str, page_type: str = "g
         )
         return resp.choices[0].message.content.strip()
 
-    return {"title": _sanitise(call(TITLE_PROMPT), brand_name), "description": _sanitise(call(DESCRIPTION_PROMPT), brand_name), "h1_optimised": _sanitise(call(H1_PROMPT))}
+    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)
 
 
 # ── Router ────────────────────────────────────────────────────────────────────

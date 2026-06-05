@@ -79,6 +79,7 @@ def _process_single_row(
             "generated_title": None, "generated_description": None,
             "optimised_h1": None, "title_length": None,
             "description_length": None, "h1_length": None,
+            "review_notes": "",
             "status": status,
         }
 
@@ -201,6 +202,7 @@ def _process_single_row(
         title       = copy.get("title", "")
         description = copy.get("description", "")
         h1_opt      = copy.get("h1_optimised", "")
+        review_notes = copy.get("review_notes", "")
         step("✓ meta copy generated — title: " + str(len(title)) + " chars, desc: " + str(len(description)) + " chars")
 
         return {
@@ -217,6 +219,7 @@ def _process_single_row(
             "title_length":         len(title),
             "description_length":   len(description),
             "h1_length":            len(h1_opt),
+            "review_notes":         review_notes,
             "status":               "ok",
         }
     except Exception as e:
