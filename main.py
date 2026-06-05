@@ -15,6 +15,7 @@ app.add_middleware(
         "https://meta.copypilot.app",
         "https://meta-saas-frontend.vercel.app",
     ],
+    allow_origin_regex=r"https://copypilot-platform(?:-[a-z0-9-]+)?-mohyeects-projects\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
