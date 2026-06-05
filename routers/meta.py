@@ -108,8 +108,14 @@ def _process_single_row(
             query_list = [q["query"] for q in gsc_queries]
 
             step("fetching DataForSEO keyword data...")
-            dfs_volumes    = get_keyword_overview(settings["dfs_login"], settings["dfs_password"], query_list, location_code=settings.get("location_code", 2840))
-            dfs_difficulty = get_keyword_difficulty(settings["dfs_login"], settings["dfs_password"], query_list, location_code=settings.get("location_code", 2840))
+            try:
+                dfs_volumes = get_keyword_overview(settings["dfs_login"], settings["dfs_password"], query_list, location_code=settings.get("location_code", 2840))
+                dfs_difficulty = get_keyword_difficulty(settings["dfs_login"], settings["dfs_password"], query_list, location_code=settings.get("location_code", 2840))
+            except Exception as dfs_error:
+                dfs_volumes = {}
+                dfs_difficulty = {}
+                keyword_source = f"fallback: DataForSEO error - {str(dfs_error)[:120]}"
+                step("DataForSEO keyword lookup failed - " + str(dfs_error)[:120])
 
             dfs_merged = {}
             has_dfs_volume = False

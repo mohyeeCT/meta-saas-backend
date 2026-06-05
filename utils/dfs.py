@@ -12,6 +12,16 @@ def _auth_header(login: str, password: str) -> dict:
     }
 
 
+def _raise_api_error(data: dict) -> None:
+    status_code = data.get("status_code")
+    if status_code is not None and status_code != 20000:
+        raise RuntimeError(f"{status_code} {data.get('status_message', 'Unknown API error')}")
+    for task in data.get("tasks") or []:
+        task_status = task.get("status_code")
+        if task_status is not None and task_status != 20000:
+            raise RuntimeError(f"{task_status} {task.get('status_message', 'Unknown task error')}")
+
+
 def get_keyword_overview(login: str, password: str, keywords: list, location_code: int = 2840) -> dict:
     """Returns dict keyed by lowercase keyword: {volume, cpc, competition}."""
     if not keywords:
@@ -26,6 +36,7 @@ def get_keyword_overview(login: str, password: str, keywords: list, location_cod
         )
         r.raise_for_status()
         data = r.json()
+        _raise_api_error(data)
         result = {}
         for task in data.get("tasks", []):
             for item in (task.get("result") or []):
@@ -36,8 +47,8 @@ def get_keyword_overview(login: str, password: str, keywords: list, location_cod
                     "competition": item.get("competition", 0)
                 }
         return result
-    except Exception:
-        return {}
+    except Exception as e:
+        raise RuntimeError(f"DataForSEO keyword volume failed: {e}") from e
 
 
 def get_keyword_difficulty(login: str, password: str, keywords: list, location_code: int = 2840) -> dict:
@@ -54,6 +65,7 @@ def get_keyword_difficulty(login: str, password: str, keywords: list, location_c
         )
         r.raise_for_status()
         data = r.json()
+        _raise_api_error(data)
         result = {}
         for task in data.get("tasks", []):
             for item in (task.get("result") or []):
@@ -63,8 +75,8 @@ def get_keyword_difficulty(login: str, password: str, keywords: list, location_c
                         "difficulty": kw_item.get("keyword_difficulty", 50) or 50
                     }
         return result
-    except Exception:
-        return {}
+    except Exception as e:
+        raise RuntimeError(f"DataForSEO keyword difficulty failed: {e}") from e
 
 
 
@@ -281,6 +293,7 @@ def get_serp_data(login: str, password: str, keyword: str, location_code: int = 
         )
         r.raise_for_status()
         data = r.json()
+        _raise_api_error(data)
 
         ai_sections = []
         ai_raw_parts = []
