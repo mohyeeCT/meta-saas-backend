@@ -5,7 +5,7 @@ See `../CLAUDE.md` for full platform context, conventions, and working rules.
 ## What This Repo Is
 
 FastAPI backend for the Meta Copy workflow.
-Deployed on Railway EU West. Default branch: `main`. Current HEAD: `d80c7a4`.
+Deployed on Railway EU West. Default branch: `main`. Current HEAD: `49796ab`.
 Runtime: Python 3.12.
 
 Railway URL: `https://meta-saas-backend-production.up.railway.app`
@@ -43,7 +43,8 @@ Same shared set as FAQ with POST /api/meta/run as the tool endpoint.
 3. Merge brand profile into guidelines
 4. Single structured JSON generation call: generate_copy
 5. Parse JSON: extract title, description, h1, review_notes
-6. Enforce length: title <= 60 chars, description <= 155 chars, H1 flagged > 70
+6. Apply relaxed length guidance: title aims for about 50 to 70 chars,
+   description aims for about 140 to 170 chars, H1 still aims for under 70
 7. Apply claim guardrails (no absolute claims without evidence)
 8. Sanitise all three outputs
 9. Write to Supabase
@@ -63,4 +64,5 @@ brand_profile_id
 - Niche context goes into brand_guidelines (not page_context — Meta has no scraping).
 - Parse AI JSON with try/except. Strip markdown fences before json.loads.
 - H1 must never contain the brand name — enforced in prompt hard rules.
-- Length enforcement is post-processing. Truncate if AI overshoots the limit.
+- Length normalization is post-processing. Trim only when title exceeds 70
+  chars or description exceeds 170 chars.
