@@ -43,9 +43,12 @@ Unsupported claim guardrail:
   unsupported specifics.
 """.strip()
 
+SOFT_TITLE_LIMIT = 70
+SOFT_DESCRIPTION_LIMIT = 170
+
 
 def _fit_to_limit(text: str, limit: int) -> str:
-    """Trim generated copy to a hard character limit without splitting words."""
+    """Trim generated copy to a pragmatic upper bound without splitting words."""
     text = (text or "").strip()
     if len(text) <= limit:
         return text
@@ -58,8 +61,8 @@ def _fit_to_limit(text: str, limit: int) -> str:
 
 def _normalise_copy_result(result: dict, brand_name: str = "") -> dict:
     return {
-        "title": _fit_to_limit(_sanitise(result.get("title", ""), brand_name), 60),
-        "description": _fit_to_limit(_sanitise(result.get("description", ""), brand_name), 155),
+        "title": _fit_to_limit(_sanitise(result.get("title", ""), brand_name), SOFT_TITLE_LIMIT),
+        "description": _fit_to_limit(_sanitise(result.get("description", ""), brand_name), SOFT_DESCRIPTION_LIMIT),
         "h1_optimised": _sanitise(result.get("h1_optimised", ""), brand_name),
         "review_notes": _sanitise(result.get("review_notes", ""), brand_name),
     }
@@ -129,7 +132,8 @@ TITLE_PROMPT = """You are a senior SEO copywriter with deep knowledge of how dif
 Write a title tag for the following page.
 
 Hard rules:
-- Maximum 60 characters. Count carefully. This is a strict limit.
+- Aim for about 50 to 70 characters.
+- Prioritise a strong, natural title over mechanically forcing the old 60-character limit.
 - Include the target keyword naturally, ideally near the start
 - No all-caps, excessive punctuation, or clickbait
 - No padding or filler words
@@ -164,7 +168,8 @@ DESCRIPTION_PROMPT = """You are a senior SEO copywriter with deep knowledge of h
 Write a meta description for the following page.
 
 Hard rules:
-- Maximum 155 characters. Count carefully. This is a strict limit.
+- Aim for about 140 to 170 characters.
+- Prioritise a clear, persuasive description over mechanically forcing the old 155-character limit.
 - Include the target keyword naturally
 - Do not duplicate the title tag
 - No all-caps, excessive punctuation, or clickbait
@@ -232,8 +237,9 @@ COPY_PROMPT = """You are a senior SEO copywriter with deep knowledge of how diff
 Write one title tag, one meta description, and one optimised H1 for the following page.
 
 Hard rules:
-- Title maximum 60 characters. Count carefully. This is a strict limit.
-- Meta description maximum 155 characters. Count carefully. This is a strict limit.
+- Title should aim for about 50 to 70 characters.
+- Meta description should aim for about 140 to 170 characters.
+- Prioritise strong, natural copy over mechanically forcing the old 60/155-character limits.
 - H1 has no hard character limit but should aim for under 70 characters.
 - Include the target keyword naturally, ideally near the start where it fits.
 - No all-caps, excessive punctuation, or clickbait.

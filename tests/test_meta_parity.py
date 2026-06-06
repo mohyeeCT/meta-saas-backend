@@ -52,11 +52,28 @@ class MetaPromptGuardrailTests(unittest.TestCase):
         self.assertIn("availability", prompt)
         self.assertIn("strategy signals", prompt)
 
-    def test_generate_copy_enforces_title_and_description_lengths(self):
+    def test_prompt_uses_relaxed_length_guidance(self):
+        prompt = copy_gen._build_prompt(
+            copy_gen.COPY_PROMPT,
+            url="https://example.com/products/widgets",
+            keyword="widgets",
+            page_type="category",
+            brand_name="Example",
+            forbidden_phrases="",
+            context="Product page context.",
+            business_type="ecommerce",
+            h1="Widgets",
+        )
+
+        self.assertIn("aim for about 50 to 70 characters", prompt)
+        self.assertIn("aim for about 140 to 170 characters", prompt)
+        self.assertNotIn("Count carefully. This is a strict limit.", prompt)
+
+    def test_generate_copy_uses_relaxed_title_and_description_lengths(self):
         original_provider = copy_gen.PROVIDERS.get("TestProvider")
         copy_gen.PROVIDERS["TestProvider"] = lambda api_key, **kwargs: {
-            "title": "This generated title is intentionally much longer than sixty characters and should be shortened",
-            "description": "This generated meta description is intentionally much longer than one hundred fifty five characters so that the normalisation layer trims it safely after the model returns the text.",
+            "title": "This generated title is intentionally much longer than seventy characters so that the normalisation layer has to shorten it safely.",
+            "description": "This generated meta description is intentionally much longer than one hundred seventy characters so that the normalisation layer trims it safely only when it clearly runs too long for a practical search snippet.",
             "h1_optimised": "Widgets for Example",
         }
 
@@ -79,8 +96,8 @@ class MetaPromptGuardrailTests(unittest.TestCase):
             else:
                 copy_gen.PROVIDERS["TestProvider"] = original_provider
 
-        self.assertLessEqual(len(result["title"]), 60)
-        self.assertLessEqual(len(result["description"]), 155)
+        self.assertLessEqual(len(result["title"]), 70)
+        self.assertLessEqual(len(result["description"]), 170)
         self.assertEqual(result["h1_optimised"], "Widgets for Example")
 
     def test_parse_copy_json_strips_fences_and_requires_object(self):
