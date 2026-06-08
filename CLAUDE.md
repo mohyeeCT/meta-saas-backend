@@ -5,7 +5,7 @@ See `../CLAUDE.md` for full platform context, conventions, and working rules.
 ## What This Repo Is
 
 FastAPI backend for the Meta Copy workflow.
-Deployed on Railway EU West. Default branch: `main`. Current HEAD: `b9ec135`.
+Deployed on Railway EU West. Default branch: `main`. Current HEAD: `1bb310d`.
 Runtime: Python 3.12.
 
 Railway URL: `https://meta-saas-backend-production.up.railway.app`
@@ -32,6 +32,7 @@ tests/
   test_dfs_error_visibility.py
   test_keyword.py
   test_meta_parity.py
+  test_model_selection.py
 ```
 
 ## Endpoints
@@ -58,8 +59,8 @@ fields plus optional review_notes. More reliable than three separate calls.
 
 ## Key Model Fields
 
-niche, business_type, provider, brand_name, include_brand, forbidden_phrases,
-brand_profile_id, restricted_industry
+niche, business_type, provider, model, brand_name, include_brand,
+forbidden_phrases, brand_profile_id, restricted_industry
 
 ## Known Gotchas
 
