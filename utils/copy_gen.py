@@ -339,7 +339,7 @@ def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = 
     def call(template):
         msg = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=256,
+            max_tokens=512,
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)}]
         )
         return msg.content[0].text.strip()
@@ -356,7 +356,7 @@ def generate_copy_openai(api_key: str, url: str, keyword: str, page_type: str = 
     def call(template):
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
-            max_tokens=256,
+            max_tokens=512,
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)}]
         )
         return resp.choices[0].message.content.strip()
@@ -389,7 +389,7 @@ def generate_copy_mistral(api_key: str, url: str, keyword: str, page_type: str =
     def call(template):
         resp = client.chat.complete(
             model="mistral-small-latest",
-            max_tokens=256,
+            max_tokens=512,
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)}]
         )
         return resp.choices[0].message.content.strip()
@@ -406,7 +406,7 @@ def generate_copy_groq(api_key: str, url: str, keyword: str, page_type: str = "g
     def call(template):
         resp = client.chat.completions.create(
             model="llama-3.1-8b-instant",
-            max_tokens=256,
+            max_tokens=512,
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)}]
         )
         return resp.choices[0].message.content.strip()
