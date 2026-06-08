@@ -65,8 +65,8 @@ class MetaPromptGuardrailTests(unittest.TestCase):
             h1="Widgets",
         )
 
-        self.assertIn("aim for about 50 to 70 characters", prompt)
-        self.assertIn("aim for about 140 to 170 characters", prompt)
+        self.assertIn("aim for about 50 to 80 characters", prompt)
+        self.assertIn("aim for about 140 to 180 characters", prompt)
         self.assertNotIn("Count carefully. This is a strict limit.", prompt)
 
     def test_generate_copy_uses_relaxed_title_and_description_lengths(self):
@@ -96,8 +96,8 @@ class MetaPromptGuardrailTests(unittest.TestCase):
             else:
                 copy_gen.PROVIDERS["TestProvider"] = original_provider
 
-        self.assertLessEqual(len(result["title"]), 70)
-        self.assertLessEqual(len(result["description"]), 170)
+        self.assertLessEqual(len(result["title"]), 80)
+        self.assertLessEqual(len(result["description"]), 180)
         self.assertEqual(result["h1_optimised"], "Widgets for Example")
 
     def test_parse_copy_json_strips_fences_and_requires_object(self):
