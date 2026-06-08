@@ -69,7 +69,8 @@ def select_keyword(
 
         dfs = dfs_data.get(query.lower(), {})
         volume = dfs.get("volume", 0) or 0
-        difficulty = dfs.get("difficulty", 50) or 50
+        kd = dfs.get("difficulty")
+        difficulty = max(kd if kd is not None else 50, 1)
 
         pos_score = _position_score(position)
         rel_score = _relevance_score(query, h1)
