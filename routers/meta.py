@@ -94,11 +94,14 @@ def _process_single_row(
     kw_difficulty = None
 
     if manual_kw:
-        # Enrich manual keyword with DFS volume + difficulty (best-effort)
+        # Enrich manual keyword with DFS volume + difficulty (best-effort, independent calls)
         try:
-            _m_vol  = get_keyword_overview(settings["dfs_login"], settings["dfs_password"], [manual_kw], location_code=settings.get("location_code", 2840))
+            _m_vol = get_keyword_overview(settings["dfs_login"], settings["dfs_password"], [manual_kw], location_code=settings.get("location_code", 2840))
+            kw_volume = _m_vol.get(manual_kw.lower(), {}).get("volume")
+        except Exception:
+            pass
+        try:
             _m_diff = get_keyword_difficulty(settings["dfs_login"], settings["dfs_password"], [manual_kw], location_code=settings.get("location_code", 2840))
-            kw_volume    = _m_vol.get(manual_kw.lower(), {}).get("volume")
             kw_difficulty = _m_diff.get(manual_kw.lower(), {}).get("difficulty")
         except Exception:
             pass
