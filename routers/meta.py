@@ -133,6 +133,7 @@ def _process_single_row(
                 branded_terms=branded_terms,
                 min_volume=settings.get("min_volume", 10),
                 h1=h1,
+                restricted_industry=settings.get("restricted_industry", False),
             )
 
             if selection.get("selected_keyword"):
@@ -355,6 +356,7 @@ class MetaSettings(BaseModel):
     use_gsc: bool = True
     site_url: str = ""
     brand_profile_id: str = ""
+    restricted_industry: bool = False
 
 
 class MetaJobRequest(BaseModel):
