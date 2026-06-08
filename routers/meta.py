@@ -133,7 +133,6 @@ def _process_single_row(
                 branded_terms=branded_terms,
                 min_volume=settings.get("min_volume", 10),
                 h1=h1,
-                used_keywords=used_keywords,
             )
 
             if selection.get("selected_keyword"):
