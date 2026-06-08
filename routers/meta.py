@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from auth import get_current_user
 from auth import get_supabase
 from utils.gsc import get_gsc_client, get_top_queries_for_url
-from utils.dfs import get_keyword_overview, get_keyword_difficulty
+from utils.dfs import get_keyword_overview
 from utils.keyword import select_keyword
 from utils.niches import get_niche_context
 from utils.copy_gen import generate_copy
@@ -75,7 +75,7 @@ def _process_single_row(
     def _empty(status: str) -> dict:
         return {
             "url": url, "selected_keyword": None, "keyword_source": status,
-            "runner_up": None, "kw_volume": None, "kw_difficulty": None,
+            "runner_up": None, "kw_volume": None,
             "generated_title": None, "generated_description": None,
             "optimised_h1": None, "title_length": None,
             "description_length": None, "h1_length": None,
@@ -91,18 +91,12 @@ def _process_single_row(
     keyword_source = "manual" if manual_kw else None
     runner_up = ""
     kw_volume = None
-    kw_difficulty = None
 
     if manual_kw:
         # Enrich manual keyword with DFS volume + difficulty (best-effort, independent calls)
         try:
             _m_vol = get_keyword_overview(settings["dfs_login"], settings["dfs_password"], [manual_kw], location_code=settings.get("location_code", 2840))
             kw_volume = _m_vol.get(manual_kw.lower(), {}).get("volume")
-        except Exception:
-            pass
-        try:
-            _m_diff = get_keyword_difficulty(settings["dfs_login"], settings["dfs_password"], [manual_kw], location_code=settings.get("location_code", 2840))
-            kw_difficulty = _m_diff.get(manual_kw.lower(), {}).get("difficulty")
         except Exception:
             pass
 
@@ -123,10 +117,8 @@ def _process_single_row(
             step("fetching DataForSEO keyword data...")
             try:
                 dfs_volumes = get_keyword_overview(settings["dfs_login"], settings["dfs_password"], query_list, location_code=settings.get("location_code", 2840))
-                dfs_difficulty = get_keyword_difficulty(settings["dfs_login"], settings["dfs_password"], query_list, location_code=settings.get("location_code", 2840))
             except Exception as dfs_error:
                 dfs_volumes = {}
-                dfs_difficulty = {}
                 keyword_source = f"fallback: DataForSEO error - {str(dfs_error)[:120]}"
                 step("DataForSEO keyword lookup failed - " + str(dfs_error)[:120])
 
@@ -134,9 +126,8 @@ def _process_single_row(
             has_dfs_volume = False
             for kw in query_list:
                 kl = kw.lower()
-                vol  = dfs_volumes.get(kl, {}).get("volume", 0)
-                diff = dfs_difficulty.get(kl, {}).get("difficulty", 50)
-                dfs_merged[kl] = {"volume": vol, "difficulty": diff}
+                vol = dfs_volumes.get(kl, {}).get("volume", 0)
+                dfs_merged[kl] = {"volume": vol, "difficulty": 50}
                 if vol > 0:
                     has_dfs_volume = True
 
@@ -154,7 +145,6 @@ def _process_single_row(
                 keyword_source = "gsc+dfs" if has_dfs_volume else "gsc-only (low DFS volume)"
                 runner_up      = selection["runner_up"]["keyword"] if selection.get("runner_up") else ""
                 kw_volume      = (selection.get("selected_keyword_data") or {}).get("volume")
-                kw_difficulty  = (selection.get("selected_keyword_data") or {}).get("difficulty")
                 step("keyword selected: " + str(keyword) + " [" + str(keyword_source) + "]" + (", vol:" + str(kw_volume) if kw_volume else ""))
             elif selection.get("fallback_triggered"):
                 non_branded = [q for q in gsc_queries if not any(b in q["query"].lower() for b in branded_terms) and q.get("position", 99) > 1.0]
@@ -163,10 +153,9 @@ def _process_single_row(
                     keyword        = top_gsc["query"]
                     keyword_source = "gsc-only (low DFS volume)"
                     runner_up      = non_branded[1]["query"] if len(non_branded) > 1 else ""
-                    # Populate volume/difficulty from DFS data already fetched
+                    # Populate volume from DFS data already fetched
                     _fb_dfs = dfs_merged.get(keyword.lower(), {})
-                    kw_volume    = _fb_dfs.get("volume")
-                    kw_difficulty = _fb_dfs.get("difficulty")
+                    kw_volume = _fb_dfs.get("volume")
                     step("keyword selected: " + str(keyword) + " [GSC fallback, low vol]")
                 else:
                     keyword_source = "fallback: no keyword passed scoring"
@@ -236,7 +225,6 @@ def _process_single_row(
             "keyword_source":       keyword_source,
             "runner_up":            runner_up,
             "kw_volume":            kw_volume,
-            "kw_difficulty":        kw_difficulty,
             "generated_title":      title,
             "generated_description": description,
             "optimised_h1":         h1_opt,
@@ -254,7 +242,6 @@ def _process_single_row(
             "keyword_source":   keyword_source,
             "runner_up":        runner_up,
             "kw_volume":        kw_volume,
-            "kw_difficulty":    kw_difficulty,
         }
 
 
