@@ -204,6 +204,7 @@ def _process_single_row(
             context=brand_guidelines,
             business_type=settings.get("business_type", "general"),
             h1=h1,
+            model=settings.get("model", ""),
         )
         title       = copy.get("title", "")
         description = copy.get("description", "")
@@ -357,6 +358,7 @@ class MetaSettings(BaseModel):
     site_url: str = ""
     brand_profile_id: str = ""
     restricted_industry: bool = False
+    model: str = ""
 
 
 class MetaJobRequest(BaseModel):

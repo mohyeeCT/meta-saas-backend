@@ -333,12 +333,13 @@ def _call_and_normalise(call_fn, url: str, keyword: str, page_type: str,
 # ── Claude ────────────────────────────────────────────────────────────────────
 def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = "general",
                          brand_name: str = "", forbidden_phrases: str = "", context: str = "",
-                         business_type: str = "general", h1: str = "") -> dict:
+                         business_type: str = "general", h1: str = "", model: str = "") -> dict:
     client = anthropic.Anthropic(api_key=api_key)
+    _model = model or "claude-sonnet-4-20250514"
 
     def call(template):
         msg = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=_model,
             max_tokens=512,
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)}]
         )
@@ -350,12 +351,13 @@ def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = 
 # ── OpenAI ────────────────────────────────────────────────────────────────────
 def generate_copy_openai(api_key: str, url: str, keyword: str, page_type: str = "general",
                          brand_name: str = "", forbidden_phrases: str = "", context: str = "",
-                         business_type: str = "general", h1: str = "") -> dict:
+                         business_type: str = "general", h1: str = "", model: str = "") -> dict:
     client = openai.OpenAI(api_key=api_key)
+    _model = model or "gpt-4o-mini"
 
     def call(template):
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=_model,
             max_tokens=512,
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)}]
         )
@@ -367,12 +369,13 @@ def generate_copy_openai(api_key: str, url: str, keyword: str, page_type: str = 
 # ── Gemini ────────────────────────────────────────────────────────────────────
 def generate_copy_gemini(api_key: str, url: str, keyword: str, page_type: str = "general",
                          brand_name: str = "", forbidden_phrases: str = "", context: str = "",
-                         business_type: str = "general", h1: str = "") -> dict:
+                         business_type: str = "general", h1: str = "", model: str = "") -> dict:
     client = google_genai.Client(api_key=api_key)
+    _model = model or "gemini-2.0-flash"
 
     def call(template):
         resp = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model=_model,
             contents=_build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)
         )
         return resp.text.strip()
@@ -383,12 +386,13 @@ def generate_copy_gemini(api_key: str, url: str, keyword: str, page_type: str = 
 # ── Mistral ───────────────────────────────────────────────────────────────────
 def generate_copy_mistral(api_key: str, url: str, keyword: str, page_type: str = "general",
                           brand_name: str = "", forbidden_phrases: str = "", context: str = "",
-                          business_type: str = "general", h1: str = "") -> dict:
+                          business_type: str = "general", h1: str = "", model: str = "") -> dict:
     client = Mistral(api_key=api_key)
+    _model = model or "mistral-small-latest"
 
     def call(template):
         resp = client.chat.complete(
-            model="mistral-small-latest",
+            model=_model,
             max_tokens=512,
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)}]
         )
@@ -400,12 +404,13 @@ def generate_copy_mistral(api_key: str, url: str, keyword: str, page_type: str =
 # ── Groq ──────────────────────────────────────────────────────────────────────
 def generate_copy_groq(api_key: str, url: str, keyword: str, page_type: str = "general",
                        brand_name: str = "", forbidden_phrases: str = "", context: str = "",
-                       business_type: str = "general", h1: str = "") -> dict:
+                       business_type: str = "general", h1: str = "", model: str = "") -> dict:
     client = Groq(api_key=api_key)
+    _model = model or "llama-3.1-8b-instant"
 
     def call(template):
         resp = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model=_model,
             max_tokens=512,
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)}]
         )
