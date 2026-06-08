@@ -144,7 +144,6 @@ def rerun_row(
 def _rerun_single_row(job_id: str, row_index: int, rows: list, settings: dict, sb, keyword_override: str = "", user_id: str = ""):
     """Background task to re-run one row and update its result in place."""
     import traceback, time
-    from utils.copy_gen import generate_faq, build_faq_schema, _fingerprint_question
     from utils.dfs import get_keyword_overview, get_keyword_difficulty, get_serp_data
     from utils.gsc import get_gsc_client, get_top_queries_for_url
     from utils.keyword import select_keyword
