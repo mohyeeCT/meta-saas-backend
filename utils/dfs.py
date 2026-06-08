@@ -51,6 +51,32 @@ def get_keyword_overview(login: str, password: str, keywords: list, location_cod
         raise RuntimeError(f"DataForSEO keyword volume failed: {e}") from e
 
 
+def get_keyword_difficulty(login: str, password: str, keywords: list, location_code: int = 2840) -> dict:
+    """Returns dict keyed by lowercase keyword: {difficulty}."""
+    if not keywords:
+        return {}
+    payload = [{"keywords": keywords, "location_code": location_code, "language_code": "en"}]
+    try:
+        r = requests.post(
+            f"{DFS_BASE}/dataforseo_labs/google/bulk_keyword_difficulty/live",
+            headers=_auth_header(login, password),
+            json=payload,
+            timeout=30
+        )
+        r.raise_for_status()
+        data = r.json()
+        _raise_api_error(data)
+        result = {}
+        for task in data.get("tasks", []):
+            for item in (task.get("result") or []):
+                for kw_item in (item.get("items") or []):
+                    kw = kw_item.get("keyword", "").lower()
+                    result[kw] = {
+                        "difficulty": kw_item.get("keyword_difficulty", 50) or 50
+                    }
+        return result
+    except Exception as e:
+        raise RuntimeError(f"DataForSEO keyword difficulty failed: {e}") from e
 
 
 def _extract_ai_overview_text(item: dict) -> str:

@@ -12,6 +12,11 @@ class DataForSeoErrorVisibilityTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "DataForSEO keyword volume failed: request timed out"):
             dfs.get_keyword_overview("login", "password", ["widgets"])
 
+    @patch("utils.dfs.requests.post", side_effect=requests.Timeout("request timed out"))
+    def test_keyword_difficulty_raises_contextual_network_error(self, _post):
+        with self.assertRaisesRegex(RuntimeError, "DataForSEO keyword difficulty failed: request timed out"):
+            dfs.get_keyword_difficulty("login", "password", ["widgets"])
+
     @patch("utils.dfs.requests.post")
     def test_keyword_helper_raises_dataforseo_api_error(self, post):
         response = Mock()
