@@ -5,7 +5,7 @@ See `../CLAUDE.md` for full platform context, conventions, and working rules.
 ## What This Repo Is
 
 FastAPI backend for the Meta Copy workflow.
-Deployed on Railway EU West. Default branch: `main`. Current HEAD: `2d5e1de`.
+Deployed on Railway EU West. Default branch: `main`. Current HEAD: `2bef58b`.
 Runtime: Python 3.12.
 
 Railway URL: `https://meta-saas-backend-production.up.railway.app`
@@ -74,8 +74,9 @@ forbidden_phrases, brand_profile_id, restricted_industry
 - `_rerun_single_row` in `jobs.py` uses a deferred `from routers.meta import
   _process_single_row, _update_job` inside the function body (not at module level)
   to avoid circular imports. Do not move it to the top of the file.
-- Manual keyword DFS enrichment uses two separate `try/except` blocks — one for
-  `get_keyword_overview` (volume) and one for `get_keyword_difficulty` (difficulty).
-  This is intentional: a failure in the difficulty call must not also lose the
-  already-fetched volume. Both are best-effort; `None` is a valid result when the
-  DFS Labs endpoint has no data for a keyword (e.g. low-traffic or new terms).
+- `get_keyword_difficulty` has been removed entirely. The DFS Labs endpoint
+  (`dataforseo_labs/bulk_keyword_difficulty`) returned no data for typical keywords.
+  `dfs_merged` now uses `difficulty=50` (hardcoded default) for all keywords.
+  GSC scoring is unchanged — difficulty was already defaulting to 50 before.
+  `kw_difficulty` is removed from all result dicts, the _empty helper, and the
+  deferred import in jobs.py.
