@@ -93,6 +93,16 @@ def _process_single_row(
     kw_volume = None
     kw_difficulty = None
 
+    if manual_kw:
+        # Enrich manual keyword with DFS volume + difficulty (best-effort)
+        try:
+            _m_vol  = get_keyword_overview(settings["dfs_login"], settings["dfs_password"], [manual_kw], location_code=settings.get("location_code", 2840))
+            _m_diff = get_keyword_difficulty(settings["dfs_login"], settings["dfs_password"], [manual_kw], location_code=settings.get("location_code", 2840))
+            kw_volume    = _m_vol.get(manual_kw.lower(), {}).get("volume")
+            kw_difficulty = _m_diff.get(manual_kw.lower(), {}).get("difficulty")
+        except Exception:
+            pass
+
     if not keyword and gsc_client and settings.get("use_gsc") and settings.get("site_url"):
         step("fetching GSC data...")
         gsc_queries = get_top_queries_for_url(
@@ -150,6 +160,10 @@ def _process_single_row(
                     keyword        = top_gsc["query"]
                     keyword_source = "gsc-only (low DFS volume)"
                     runner_up      = non_branded[1]["query"] if len(non_branded) > 1 else ""
+                    # Populate volume/difficulty from DFS data already fetched
+                    _fb_dfs = dfs_merged.get(keyword.lower(), {})
+                    kw_volume    = _fb_dfs.get("volume")
+                    kw_difficulty = _fb_dfs.get("difficulty")
                     step("keyword selected: " + str(keyword) + " [GSC fallback, low vol]")
                 else:
                     keyword_source = "fallback: no keyword passed scoring"
