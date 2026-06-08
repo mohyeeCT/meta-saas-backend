@@ -5,7 +5,7 @@ See `../CLAUDE.md` for full platform context, conventions, and working rules.
 ## What This Repo Is
 
 FastAPI backend for the Meta Copy workflow.
-Deployed on Railway EU West. Default branch: `main`. Current HEAD: `2bef58b`.
+Deployed on Railway EU West. Default branch: `main`. Current HEAD: `6bf1d98`.
 Runtime: Python 3.12.
 
 Railway URL: `https://meta-saas-backend-production.up.railway.app`
@@ -74,9 +74,10 @@ forbidden_phrases, brand_profile_id, restricted_industry
 - `_rerun_single_row` in `jobs.py` uses a deferred `from routers.meta import
   _process_single_row, _update_job` inside the function body (not at module level)
   to avoid circular imports. Do not move it to the top of the file.
-- `get_keyword_difficulty` has been removed entirely. The DFS Labs endpoint
-  (`dataforseo_labs/bulk_keyword_difficulty`) returned no data for typical keywords.
-  `dfs_merged` now uses `difficulty=50` (hardcoded default) for all keywords.
-  GSC scoring is unchanged — difficulty was already defaulting to 50 before.
-  `kw_difficulty` is removed from all result dicts, the _empty helper, and the
-  deferred import in jobs.py.
+- `get_keyword_difficulty` calls `dataforseo_labs/google/bulk_keyword_difficulty/live`.
+  The API nests results at `tasks[].result[].items[]` — one level deeper than the
+  volume endpoint. The parsing loop must go three levels deep (tasks → result → items)
+  to read `keyword_difficulty`. A previous bug iterated `result[]` directly, causing
+  all lookups to return the empty-string key and difficulty to silently default to 50.
+  `kw_difficulty` is tracked through `_process_single_row` and included in all
+  result dicts and `_empty`.
