@@ -5,7 +5,7 @@ See `../CLAUDE.md` for full platform context, conventions, and working rules.
 ## What This Repo Is
 
 FastAPI backend for the Meta Copy workflow.
-Deployed on Railway EU West. Default branch: `main`. Current HEAD: `9e1ab3d`.
+Deployed on Railway EU West. Default branch: `main`. Current HEAD: `ef6162e`.
 Runtime: Python 3.12.
 
 Railway URL: `https://meta-saas-backend-production.up.railway.app`
@@ -69,3 +69,8 @@ forbidden_phrases, brand_profile_id, restricted_industry
 - H1 must never contain the brand name — enforced in prompt hard rules.
 - Length normalization is post-processing. Trim only when title exceeds 80
   chars or description exceeds 180 chars.
+- `model` is NOT excluded from `model_dump(exclude={"api_key","dfs_password"})` — it IS
+  stored in the job settings JSON in Supabase and survives reruns correctly.
+- `_rerun_single_row` in `jobs.py` uses a deferred `from routers.meta import
+  _process_single_row, _update_job` inside the function body (not at module level)
+  to avoid circular imports. Do not move it to the top of the file.
