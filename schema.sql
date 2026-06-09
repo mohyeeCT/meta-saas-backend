@@ -61,3 +61,23 @@ create policy "Users can only access their own brand profiles"
 
 create index if not exists brand_profiles_user_id_idx on public.brand_profiles (user_id);
 
+
+
+-- Job templates table
+create table if not exists public.job_templates (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid references auth.users not null,
+  tool        text not null,
+  name        text not null,
+  settings    jsonb default '{}',
+  created_at  timestamptz default now()
+);
+
+alter table public.job_templates enable row level security;
+
+create policy "Users can only access their own job templates"
+  on public.job_templates for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create index if not exists job_templates_user_id_idx on public.job_templates (user_id);
