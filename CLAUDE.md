@@ -81,3 +81,23 @@ forbidden_phrases, brand_profile_id, restricted_industry
   all lookups to return the empty-string key and difficulty to silently default to 50.
   `kw_difficulty` is tracked through `_process_single_row` and included in all
   result dicts and `_empty`.
+
+
+## Local Dev Setup
+
+Tests require FastAPI and all backend dependencies. Without a venv, `pytest`
+will fail on collection with `ModuleNotFoundError: No module named 'fastapi'`.
+
+```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
+
+pip install -r requirements.txt pytest
+python -m pytest tests/ -v
+```
+
+CI (GitHub Actions) installs dependencies automatically — this setup is only
+needed for local test runs.
