@@ -22,6 +22,25 @@ def _raise_api_error(data: dict) -> None:
             raise RuntimeError(f"{task_status} {task.get('status_message', 'Unknown task error')}")
 
 
+def _friendly_error(exc: Exception) -> str:
+    """Convert raw DFS exceptions into user-readable messages."""
+    msg = str(exc)
+    msg_lower = msg.lower()
+    if "401" in msg:
+        return "Invalid DataForSEO login or password."
+    if "403" in msg:
+        return "DataForSEO account lacks required API permissions."
+    if "429" in msg or "20001" in msg or "too many requests" in msg_lower:
+        return "DataForSEO rate limit reached. Wait 60 seconds and retry."
+    if "timed out" in msg_lower or "timeout" in msg_lower:
+        return "DataForSEO request timed out. Check your internet connection."
+    if "connectionerror" in msg_lower or "remotedisconnected" in msg_lower:
+        return "Cannot connect to DataForSEO API. Check your internet connection."
+    if "40501" in msg:
+        return "DataForSEO: Invalid parameters. Check location code and keyword format."
+    return f"DataForSEO error: {msg}"
+
+
 def get_keyword_overview(login: str, password: str, keywords: list, location_code: int = 2840) -> dict:
     """Returns dict keyed by lowercase keyword: {volume, cpc, competition}."""
     if not keywords:
@@ -48,7 +67,7 @@ def get_keyword_overview(login: str, password: str, keywords: list, location_cod
                 }
         return result
     except Exception as e:
-        raise RuntimeError(f"DataForSEO keyword volume failed: {e}") from e
+        raise RuntimeError(_friendly_error(e)) from e
 
 
 def get_keyword_difficulty(login: str, password: str, keywords: list, location_code: int = 2840) -> dict:
@@ -77,7 +96,7 @@ def get_keyword_difficulty(login: str, password: str, keywords: list, location_c
                     }
         return result
     except Exception as e:
-        raise RuntimeError(f"DataForSEO keyword difficulty failed: {e}") from e
+        raise RuntimeError(_friendly_error(e)) from e
 
 
 def _extract_ai_overview_text(item: dict) -> str:

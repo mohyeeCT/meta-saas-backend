@@ -9,12 +9,12 @@ from utils import dfs
 class DataForSeoErrorVisibilityTests(unittest.TestCase):
     @patch("utils.dfs.requests.post", side_effect=requests.Timeout("request timed out"))
     def test_keyword_overview_raises_contextual_network_error(self, _post):
-        with self.assertRaisesRegex(RuntimeError, "DataForSEO keyword volume failed: request timed out"):
+        with self.assertRaisesRegex(RuntimeError, "DataForSEO request timed out"):
             dfs.get_keyword_overview("login", "password", ["widgets"])
 
     @patch("utils.dfs.requests.post", side_effect=requests.Timeout("request timed out"))
     def test_keyword_difficulty_raises_contextual_network_error(self, _post):
-        with self.assertRaisesRegex(RuntimeError, "DataForSEO keyword difficulty failed: request timed out"):
+        with self.assertRaisesRegex(RuntimeError, "DataForSEO request timed out"):
             dfs.get_keyword_difficulty("login", "password", ["widgets"])
 
     @patch("utils.dfs.requests.post")
@@ -32,7 +32,7 @@ class DataForSeoErrorVisibilityTests(unittest.TestCase):
         }
         post.return_value = response
 
-        with self.assertRaisesRegex(RuntimeError, "DataForSEO keyword volume failed: 40100 Authentication failed"):
+        with self.assertRaisesRegex(RuntimeError, "Invalid DataForSEO login or password"):
             dfs.get_keyword_overview("login", "password", ["widgets"])
 
     @patch("time.sleep")
