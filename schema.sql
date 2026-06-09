@@ -15,7 +15,8 @@ create table if not exists public.jobs (
   status         text default 'pending'
                    check (status = any (array['pending','running','complete','failed','cancelled','cancelling'])),
   name           text,
-  tool           text default 'faq',
+  tool           text default 'faq'
+                   check (tool = any (array['faq','intro','meta','page-copy','all-in-one'])),
   settings       jsonb default '{}',
   rows           jsonb default '[]',
   results        jsonb default '[]',
