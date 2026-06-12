@@ -177,8 +177,13 @@ def _process_single_row(
         else:
             keyword_source = "fallback: no GSC data"
             step("⚠ no GSC data returned")
-    elif not keyword:
-        keyword_source = "skipped: GSC disabled and no keyword provided"
+    elif not keyword and not settings.get("use_gsc"):
+        if h1:
+            keyword = h1
+            keyword_source = "h1 fallback"
+            step("GSC disabled - using H1 as keyword fallback")
+        else:
+            keyword_source = "skipped: GSC disabled and no keyword or H1 provided"
 
     if not keyword:
         step("✗ no keyword — skipping AI call")
