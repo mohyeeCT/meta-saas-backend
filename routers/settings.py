@@ -1,14 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from auth import get_current_user, get_supabase
+from credentials import clear_server_credential_field, load_user_credentials, save_server_credentials, split_provider_settings, strip_secret_fields
 
 router = APIRouter()
 
 
+class ProviderSettingsUpsert(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    provider: Optional[str] = None
+    api_key: Optional[str] = None
+    dfs_login: Optional[str] = None
+    dfs_password: Optional[str] = None
+    jina_api_key: Optional[str] = None
+    site_url: Optional[str] = None
+
+
 class SettingsUpsert(BaseModel):
     gsc_service_account: Optional[dict] = None
-    provider_settings: Optional[dict] = None
+    provider_settings: Optional[ProviderSettingsUpsert] = None
     brand_profile: Optional[dict] = None
 
 
@@ -38,7 +49,7 @@ def get_settings(user=Depends(get_current_user)):
         }
 
     # Provider settings
-    ps = row.get("provider_settings") or {}
+    ps = load_user_credentials(sb, user.id).get("provider_settings") or {}
     ps_safe = None
     if ps:
         ps_safe = {
@@ -78,19 +89,27 @@ def upsert_settings(body: SettingsUpsert, user=Depends(get_current_user)):
     # Fetch existing to merge provider_settings
     existing = sb.table("user_settings").select("provider_settings, gsc_service_account, brand_profile").eq("user_id", user.id).execute()
     existing_row = existing.data[0] if existing.data else {}
+    existing_credentials = load_user_credentials(sb, user.id)
 
     data = {"user_id": user.id, "updated_at": "now()"}
 
     if body.gsc_service_account is not None:
-        data["gsc_service_account"] = body.gsc_service_account
+        if not save_server_credentials(sb, user.id, gsc_service_account=body.gsc_service_account):
+            raise HTTPException(status_code=503, detail="Secure credential storage is temporarily unavailable")
+        data["gsc_service_account"] = None
     elif "gsc_service_account" in existing_row:
         data["gsc_service_account"] = existing_row["gsc_service_account"]
 
     if body.provider_settings is not None:
-        # Merge with existing so partial updates don't wipe other fields
-        existing_ps = existing_row.get("provider_settings") or {}
-        merged = {**existing_ps, **{k: v for k, v in body.provider_settings.items() if v is not None and v != ""}}
-        data["provider_settings"] = merged
+        incoming = body.provider_settings.model_dump(exclude_none=True)
+        safe_update, secret_update = split_provider_settings(incoming)
+        existing_safe = strip_secret_fields(existing_row.get("provider_settings") or {})
+        existing_secrets = {key: value for key, value in (existing_credentials.get("provider_settings") or {}).items() if key in {"api_key", "dfs_password", "jina_api_key"} and value}
+        merged_safe = {**existing_safe, **{k: v for k, v in safe_update.items() if v != ""}}
+        merged_secrets = {**existing_secrets, **secret_update}
+        if not save_server_credentials(sb, user.id, provider_settings=merged_secrets):
+            raise HTTPException(status_code=503, detail="Secure credential storage is temporarily unavailable")
+        data["provider_settings"] = merged_safe
     elif "provider_settings" in existing_row:
         data["provider_settings"] = existing_row["provider_settings"]
 
@@ -108,20 +127,23 @@ def upsert_settings(body: SettingsUpsert, user=Depends(get_current_user)):
 
 @router.get("/provider-credentials")
 def get_provider_credentials(user=Depends(get_current_user)):
-    """Return full provider credentials for pre-filling job form. Includes api_key."""
+    """Return provider metadata without exposing saved secrets."""
     sb = get_supabase()
-    res = sb.table("user_settings").select("provider_settings, brand_profile").eq("user_id", user.id).execute()
+    res = sb.table("user_settings").select("brand_profile").eq("user_id", user.id).execute()
     if not res.data:
         return {}
-    ps = res.data[0].get("provider_settings") or {}
+    ps = load_user_credentials(sb, user.id).get("provider_settings") or {}
     bp = res.data[0].get("brand_profile") or {}
     return {
         "provider": ps.get("provider", ""),
-        "api_key": ps.get("api_key", ""),
+        "api_key": "",
         "dfs_login": ps.get("dfs_login", ""),
-        "dfs_password": ps.get("dfs_password", ""),
-        "jina_api_key": ps.get("jina_api_key", ""),
+        "dfs_password": "",
+        "jina_api_key": "",
         "site_url": ps.get("site_url", ""),
+        "has_api_key": bool(ps.get("api_key")),
+        "has_dfs_password": bool(ps.get("dfs_password")),
+        "has_jina_key": bool(ps.get("jina_api_key")),
         "brand_name": bp.get("brand_name", ""),
     }
 
@@ -130,6 +152,7 @@ def get_provider_credentials(user=Depends(get_current_user)):
 def delete_gsc_account(user=Depends(get_current_user)):
     """Remove stored GSC service account."""
     sb = get_supabase()
+    clear_server_credential_field(sb, user.id, "gsc_service_account")
     sb.table("user_settings").update({"gsc_service_account": None}).eq("user_id", user.id).execute()
     return {"deleted": True}
 
@@ -138,6 +161,7 @@ def delete_gsc_account(user=Depends(get_current_user)):
 def delete_credentials(user=Depends(get_current_user)):
     """Remove stored provider credentials."""
     sb = get_supabase()
+    clear_server_credential_field(sb, user.id, "provider_settings")
     sb.table("user_settings").update({"provider_settings": {}}).eq("user_id", user.id).execute()
     return {"deleted": True}
 

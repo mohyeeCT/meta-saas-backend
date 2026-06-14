@@ -72,6 +72,18 @@ do $$ begin
   end if;
 end $$;
 
+-- Server-only credentials. No anon/authenticated RLS policy is intentional.
+create table if not exists public.user_credentials (
+  user_id uuid primary key references auth.users on delete cascade,
+  provider_settings jsonb not null default '{}',
+  gsc_service_account jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.user_credentials enable row level security;
+revoke all on table public.user_credentials from anon, authenticated;
+grant all on table public.user_credentials to service_role;
+
 
 -- ── Brand profiles ────────────────────────────────────────────────────────────
 

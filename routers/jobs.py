@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from auth import get_current_user, get_supabase
+from credentials import hydrate_job_settings
 
 router = APIRouter()
 
@@ -143,6 +144,7 @@ def rerun_row(
 
 def _rerun_single_row(job_id: str, row_index: int, rows: list, settings: dict, sb, keyword_override: str = "", user_id: str = ""):
     """Background task to re-run one row and update its result in place."""
+    settings = hydrate_job_settings(sb, user_id, settings)
     import traceback, time
     from utils.dfs import get_keyword_overview, get_keyword_difficulty, get_serp_data
     from utils.gsc import get_gsc_client, get_top_queries_for_url
@@ -173,9 +175,9 @@ def _rerun_single_row(job_id: str, row_index: int, rows: list, settings: dict, s
         gsc_client = None
         if settings.get("use_gsc"):
             try:
-                sa_res = sb.table("user_settings").select("gsc_service_account").eq("user_id", user_id).execute()
-                if sa_res.data and sa_res.data[0].get("gsc_service_account"):
-                    gsc_client = get_gsc_client(sa_res.data[0]["gsc_service_account"])
+                sa_info = settings.get("_gsc_service_account")
+                if sa_info:
+                    gsc_client = get_gsc_client(sa_info)
             except Exception:
                 pass
 
@@ -273,6 +275,7 @@ def rerun_rows(
 
 def _rerun_multiple_rows(job_id: str, row_indices: list, rows: list, settings: dict, sb, user_id: str = ""):
     """Run multiple rows sequentially, updating results in place."""
+    settings = hydrate_job_settings(sb, user_id, settings)
     from routers.meta import _process_single_row, _update_job
     from utils.gsc import get_gsc_client
 
@@ -297,9 +300,9 @@ def _rerun_multiple_rows(job_id: str, row_indices: list, rows: list, settings: d
     gsc_client = None
     if settings.get("use_gsc"):
         try:
-            sa_res = sb.table("user_settings").select("gsc_service_account").eq("user_id", user_id).execute()
-            if sa_res.data and sa_res.data[0].get("gsc_service_account"):
-                gsc_client = get_gsc_client(sa_res.data[0]["gsc_service_account"])
+            sa_info = settings.get("_gsc_service_account")
+            if sa_info:
+                gsc_client = get_gsc_client(sa_info)
         except Exception:
             pass
 

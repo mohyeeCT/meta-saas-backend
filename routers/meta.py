@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from auth import get_current_user
 from auth import get_supabase
+from credentials import hydrate_job_settings, load_user_credentials, strip_secret_fields
 from utils.gsc import get_gsc_client, get_top_queries_for_url
 from utils.dfs import get_keyword_overview, get_keyword_difficulty
 from utils.keyword import select_keyword
@@ -397,14 +398,16 @@ def run_meta_job(
     sb=Depends(get_supabase),
 ):
     job_id = str(uuid.uuid4())
+    runtime_settings = hydrate_job_settings(sb, user.id, request.settings.model_dump())
+    saved_credentials = load_user_credentials(sb, user.id)
+    if not runtime_settings.get("api_key") or not runtime_settings.get("dfs_password"):
+        raise HTTPException(status_code=400, detail="Saved provider credentials are incomplete. Update Settings and try again.")
 
     # Fetch GSC service account
     sa_info = None
     if request.settings.use_gsc:
         try:
-            sa_res = sb.table("user_settings").select("gsc_service_account").eq("user_id", user.id).execute()
-            if sa_res.data and sa_res.data[0].get("gsc_service_account"):
-                sa_info = sa_res.data[0]["gsc_service_account"]
+            sa_info = saved_credentials.get("gsc_service_account")
         except Exception:
             pass
 
@@ -430,7 +433,7 @@ def run_meta_job(
         "results":       [],
         "logs":          [],
         "rows":          [r.model_dump() for r in request.rows],
-        "settings":      request.settings.model_dump(exclude={"api_key", "dfs_password"}),
+        "settings":      strip_secret_fields(request.settings.model_dump()),
         "current_step":  "Queued...",
     }).execute()
 
@@ -438,7 +441,7 @@ def run_meta_job(
         _process_job,
         job_id=job_id,
         rows=[r.model_dump() for r in request.rows],
-        settings=request.settings.model_dump(),
+        settings=runtime_settings,
         sa_info=sa_info,
         brand_profile=brand_profile,
     )
