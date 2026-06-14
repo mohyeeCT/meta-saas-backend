@@ -44,6 +44,9 @@ do $$ begin
 end $$;
 
 create index if not exists jobs_user_id_idx    on public.jobs (user_id);
+create unique index if not exists jobs_one_active_per_user_tool_idx
+  on public.jobs (user_id, tool)
+  where status in ('pending', 'running', 'cancelling');
 create index if not exists jobs_created_at_idx on public.jobs (created_at desc);
 
 
