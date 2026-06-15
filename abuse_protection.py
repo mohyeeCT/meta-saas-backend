@@ -1,7 +1,26 @@
+import logging
+import math
+
 from fastapi import HTTPException
 
 
 ACTIVE_JOB_STATUSES = ("pending", "running", "cancelling")
+RATE_LIMIT_WINDOW_SECONDS = 600
+RATE_LIMIT_LABELS = {"job-create": "job creation", "row-rerun": "row rerun", "bulk-rerun": "bulk rerun", "section-rerun": "section rerun"}
+
+
+def enforce_rate_limit(sb, user_id: str, tool: str, action: str, limit: int):
+    try:
+        result = sb.rpc("check_rate_limit", {"p_user_id": user_id, "p_tool": tool, "p_action": action, "p_limit": limit, "p_window_seconds": RATE_LIMIT_WINDOW_SECONDS}).execute()
+    except Exception:
+        logging.exception("Rate-limit check failed open for %s/%s", tool, action)
+        return
+    row = result.data[0] if isinstance(result.data, list) and result.data else result.data
+    if not isinstance(row, dict) or row.get("allowed", True):
+        return
+    retry_after = max(1, math.ceil(float(row.get("retry_after_seconds") or 1)))
+    wait = f"{retry_after} seconds" if retry_after < 60 else f"{math.ceil(retry_after / 60)} minutes"
+    raise HTTPException(status_code=429, detail=f"Too many {RATE_LIMIT_LABELS.get(action, 'request')} requests. Please wait {wait} before trying again.", headers={"Retry-After": str(retry_after)})
 
 
 def execute_active_job_write(operation, tool: str):

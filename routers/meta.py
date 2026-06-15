@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from auth import get_current_user
 from auth import get_supabase
-from abuse_protection import enforce_job_start, execute_active_job_write
+from abuse_protection import enforce_job_start, enforce_rate_limit, execute_active_job_write
 from credentials import hydrate_job_settings, load_user_credentials, strip_secret_fields
 from utils.gsc import get_gsc_client, get_top_queries_for_url
 from utils.dfs import get_keyword_overview, get_keyword_difficulty
@@ -400,6 +400,7 @@ def run_meta_job(
 ):
     job_id = str(uuid.uuid4())
     enforce_job_start(sb, user.id, "meta", len(request.rows), 150)
+    enforce_rate_limit(sb, user.id, "meta", "job-create", 10)
     runtime_settings = hydrate_job_settings(sb, user.id, request.settings.model_dump())
     saved_credentials = load_user_credentials(sb, user.id)
     if not runtime_settings.get("api_key") or not runtime_settings.get("dfs_password"):

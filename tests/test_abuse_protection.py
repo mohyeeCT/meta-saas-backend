@@ -2,7 +2,7 @@ import unittest
 
 from fastapi import HTTPException
 
-from abuse_protection import enforce_job_start, execute_active_job_write
+from abuse_protection import enforce_job_start, enforce_rate_limit, execute_active_job_write
 
 
 class FakeQuery:
@@ -34,3 +34,19 @@ class AbuseProtectionTests(unittest.TestCase):
         enforce_job_start(active, "user-1", "meta", 1, 150, exclude_job_id="job-1")
         with self.assertRaisesRegex(HTTPException, "already active"):
             execute_active_job_write(lambda: (_ for _ in ()).throw(RuntimeError("jobs_one_active_per_user_tool_idx")), "meta")
+
+    def test_rate_limit_contract(self):
+        class Rpc:
+            def __init__(self, data=None, error=None): self.data, self.error, self.params = data, error, None
+            def rpc(self, name, params): self.params = params; return self
+            def execute(self):
+                if self.error: raise self.error
+                return type("Result", (), {"data": self.data})()
+        allowed = Rpc([{"allowed": True, "retry_after_seconds": 0}])
+        enforce_rate_limit(allowed, "user-1", "meta", "job-create", 10)
+        self.assertEqual(allowed.params["p_window_seconds"], 600)
+        with self.assertRaises(HTTPException) as raised:
+            enforce_rate_limit(Rpc([{"allowed": False, "retry_after_seconds": 181}]), "user-1", "meta", "bulk-rerun", 10)
+        self.assertEqual(raised.exception.headers["Retry-After"], "181")
+        self.assertIn("Please wait 4 minutes", raised.exception.detail)
+        enforce_rate_limit(Rpc(error=RuntimeError("unavailable")), "user-1", "meta", "job-create", 10)
