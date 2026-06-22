@@ -56,6 +56,7 @@ class MetaH1KeywordFallbackTests(unittest.TestCase):
                 used_keywords=set(),
                 sb=_FakeSupabase(),
                 job_id="job-1",
+                user_id="user-1",
                 row_num=1,
                 total_rows=1,
             )
