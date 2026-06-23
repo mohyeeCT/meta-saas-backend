@@ -8,6 +8,7 @@ router = APIRouter()
 
 _GSC_RECONNECT_ERROR = "Google Search Console reconnect required."
 _GSC_UNAVAILABLE_ERROR = "Selected Google Search Console connection unavailable."
+_GSC_CONFIG_ERROR = "Google Search Console OAuth configuration missing."
 _CREDENTIALS_UNAVAILABLE_ERROR = "Saved credentials are temporarily unavailable."
 _RERUN_RESULTS_ERROR = "Re-run results could not be saved. Please try again."
 
@@ -104,7 +105,7 @@ def _clear_gsc_runtime_error(sb, job_id: str, user_id: str):
             .update({"error": None})
             .eq("id", job_id)
             .eq("user_id", user_id)
-            .in_("error", [_GSC_UNAVAILABLE_ERROR, _GSC_RECONNECT_ERROR])
+            .in_("error", [_GSC_UNAVAILABLE_ERROR, _GSC_RECONNECT_ERROR, _GSC_CONFIG_ERROR])
             .execute()
         )
     except Exception:
@@ -152,12 +153,14 @@ def _get_runtime_gsc_client(settings: dict, sb, user_id: str, job_id: str):
         _persist_gsc_error(sb, job_id, user_id, _GSC_UNAVAILABLE_ERROR)
         return None
 
-    from utils.gsc import get_gsc_client
+    from utils.gsc import GscOAuthConfigError, get_gsc_client
 
     try:
         client = get_gsc_client(credentials)
         _clear_gsc_runtime_error(sb, job_id, user_id)
         return client
+    except GscOAuthConfigError:
+        _persist_gsc_error(sb, job_id, user_id, _GSC_CONFIG_ERROR)
     except RefreshError:
         if credentials.get("method") == "google_oauth":
             _persist_gsc_error(sb, job_id, user_id, _GSC_RECONNECT_ERROR)

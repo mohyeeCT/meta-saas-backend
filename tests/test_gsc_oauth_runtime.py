@@ -279,9 +279,23 @@ class GscClientTests(unittest.TestCase):
             call.build("searchconsole", "v1", credentials=credentials),
         ])
 
+    def test_oauth_sanitizes_env_values_before_building_credentials(self):
+        credentials = Mock()
+        with (
+            patch.dict(os.environ, {"GOOGLE_OAUTH_CLIENT_ID": "\ufeffclient-id\n", "GOOGLE_OAUTH_CLIENT_SECRET": " client-secret\t"}, clear=True),
+            patch.object(gsc, "decrypt_secret", return_value="refresh-token", create=True),
+            patch.object(gsc, "OAuthCredentials", return_value=credentials, create=True) as oauth_credentials,
+            patch.object(gsc, "Request", create=True),
+            patch.object(gsc, "build"),
+        ):
+            gsc.get_gsc_client(OAUTH)
+
+        self.assertEqual(oauth_credentials.call_args.kwargs["client_id"], "client-id")
+        self.assertEqual(oauth_credentials.call_args.kwargs["client_secret"], "client-secret")
+
     def test_missing_env_precedes_decrypt_and_invalid_envelopes_are_safe(self):
         with patch.dict(os.environ, {"GOOGLE_OAUTH_CLIENT_SECRET": "secret"}, clear=True), patch.object(gsc, "decrypt_secret", create=True) as decrypt:
-            with self.assertRaisesRegex(KeyError, "GOOGLE_OAUTH_CLIENT_ID"):
+            with self.assertRaisesRegex(gsc.GscOAuthConfigError, "Google OAuth configuration is incomplete"):
                 gsc.get_gsc_client(OAUTH)
             decrypt.assert_not_called()
 
@@ -628,7 +642,7 @@ class RuntimePathTests(unittest.TestCase):
             self.assertEqual(sb.tables["jobs"][0]["error"], expected)
             clear = [q for q in sb.executed if q.operation == "update" and q.payload == {"error": None}][0]
             self.assertEqual(clear.filters, [("id", "job-1"), ("user_id", "user-1")])
-            self.assertEqual(clear.in_filters, [("error", (UNAVAILABLE_ERROR, RECONNECT_ERROR))])
+            self.assertEqual(clear.in_filters, [("error", (UNAVAILABLE_ERROR, RECONNECT_ERROR, jobs._GSC_CONFIG_ERROR))])
 
     def test_single_and_multi_reruns_freshly_hydrate_and_use_exact_envelope(self):
         for function, indices in ((jobs._rerun_single_row, None), (jobs._rerun_multiple_rows, [0])):

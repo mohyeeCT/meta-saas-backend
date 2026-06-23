@@ -10,6 +10,22 @@ from gsc_crypto import decrypt_secret
 GSC_SCOPES = ["https://www.googleapis.com/auth/webmasters.readonly"]
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 _INVALID_CREDENTIALS = "Invalid GSC credentials"
+_OAUTH_CONFIG_ERROR = "Google OAuth configuration is incomplete"
+
+
+class GscOAuthConfigError(RuntimeError):
+    pass
+
+
+def _oauth_env(name: str) -> str:
+    try:
+        value = os.environ[name]
+    except KeyError:
+        raise GscOAuthConfigError(_OAUTH_CONFIG_ERROR) from None
+    value = value.strip().lstrip("\ufeff").strip()
+    if not value:
+        raise GscOAuthConfigError(_OAUTH_CONFIG_ERROR)
+    return value
 
 
 def get_gsc_client(credentials_envelope: dict):
@@ -26,8 +42,8 @@ def get_gsc_client(credentials_envelope: dict):
         ciphertext = credentials_envelope.get("refresh_token_ciphertext")
         if not isinstance(ciphertext, str) or not ciphertext:
             raise ValueError(_INVALID_CREDENTIALS)
-        client_id = os.environ["GOOGLE_OAUTH_CLIENT_ID"]
-        client_secret = os.environ["GOOGLE_OAUTH_CLIENT_SECRET"]
+        client_id = _oauth_env("GOOGLE_OAUTH_CLIENT_ID")
+        client_secret = _oauth_env("GOOGLE_OAUTH_CLIENT_SECRET")
         refresh_token = decrypt_secret(ciphertext)
         creds = OAuthCredentials(
             token=None,
