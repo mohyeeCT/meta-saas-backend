@@ -19,6 +19,7 @@ router = APIRouter()
 
 _GSC_RECONNECT_ERROR = "Google Search Console reconnect required."
 _GSC_UNAVAILABLE_ERROR = "Selected Google Search Console connection unavailable."
+_GSC_METHOD_LABELS = {"google_oauth", "service_account", "disabled", "unavailable"}
 
 _RATE_LIMITS = {
     "Claude": 0.5,
@@ -27,6 +28,15 @@ _RATE_LIMITS = {
     "Mistral (free tier)": 2.0,
     "Groq (free tier)": 2.0,
 }
+
+
+def _safe_gsc_auth_method(settings: dict, gsc_credentials: dict | None, gsc_client=None) -> str:
+    if not settings.get("use_gsc"):
+        return "disabled"
+    if not gsc_credentials or not gsc_client:
+        return "unavailable"
+    method = gsc_credentials.get("method")
+    return method if method in _GSC_METHOD_LABELS else "unavailable"
 
 
 def _is_cancelled(sb, job_id: str, user_id: str) -> bool:
@@ -69,6 +79,7 @@ def _process_single_row(
     row_num: int,
     total_rows: int,
     brand_profile: dict = None,
+    gsc_auth_method: str = "disabled",
 ) -> dict:
     def step(msg: str):
         _update_job(sb, job_id, user_id, {"current_step": f"Row {row_num}/{total_rows}: {msg}"})
@@ -82,6 +93,7 @@ def _process_single_row(
     def _empty(status: str) -> dict:
         return {
             "url": url, "selected_keyword": None, "keyword_source": status,
+            "gsc_auth_method": gsc_auth_method,
             "runner_up": None, "kw_volume": None, "kw_difficulty": None,
             "generated_title": None, "generated_description": None,
             "optimised_h1": None, "title_length": None,
@@ -246,6 +258,7 @@ def _process_single_row(
             "h1_input":             h1,
             "selected_keyword":     keyword,
             "keyword_source":       keyword_source,
+            "gsc_auth_method":      gsc_auth_method,
             "runner_up":            runner_up,
             "kw_volume":            kw_volume,
             "kw_difficulty":        kw_difficulty,
@@ -264,6 +277,7 @@ def _process_single_row(
             **_empty("error: Copy generation failed."),
             "selected_keyword": keyword,
             "keyword_source":   keyword_source,
+            "gsc_auth_method":  gsc_auth_method,
             "runner_up":        runner_up,
             "kw_volume":        kw_volume,
             "kw_difficulty":    kw_difficulty,
@@ -308,6 +322,9 @@ def _process_job(
                     _update_job(sb, job_id, user_id, {"error": _GSC_UNAVAILABLE_ERROR})
             except Exception:
                 _update_job(sb, job_id, user_id, {"error": _GSC_UNAVAILABLE_ERROR})
+    gsc_auth_method = _safe_gsc_auth_method(settings, gsc_credentials, gsc_client)
+    if settings.get("use_gsc"):
+        _update_job(sb, job_id, user_id, {"current_step": f"GSC auth method: {gsc_auth_method}"})
 
     import re as _re
     branded_terms = [b.strip() for b in settings.get("brand_name", "").split() if b.strip()]
@@ -345,6 +362,7 @@ def _process_job(
             row_num=idx + 1,
             total_rows=total,
             brand_profile=brand_profile,
+            gsc_auth_method=gsc_auth_method,
         )
         results.append(result)
 

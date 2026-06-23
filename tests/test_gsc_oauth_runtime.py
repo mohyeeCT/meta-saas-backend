@@ -588,6 +588,7 @@ class RuntimePathTests(unittest.TestCase):
                 meta._process_job("job-1", [{"url": "https://example.com/page"}], _runtime_settings(envelope), envelope, user_id="user-1")
                 get_client.assert_called_once_with(envelope)
                 self.assertEqual(process.call_args.kwargs["gsc_client"], "client")
+                self.assertEqual(process.call_args.kwargs["gsc_auth_method"], envelope["method"])
 
         for failure, expected in ((RefreshError("provider detail"), RECONNECT_ERROR), (RuntimeError("provider detail"), UNAVAILABLE_ERROR)):
             updates = []
@@ -647,7 +648,43 @@ class RuntimePathTests(unittest.TestCase):
                     hydrate.assert_called_once_with(sb, "user-1", _stored_job()["settings"])
                     client.assert_called_once_with(_runtime_settings(envelope), sb, "user-1", "job-1")
                     self.assertEqual(process.call_args.kwargs["gsc_client"], "client")
+                    self.assertEqual(process.call_args.kwargs["gsc_auth_method"], envelope["method"])
                     _assert_persistence_is_secret_free(self, sb)
+
+    def test_single_row_result_includes_safe_gsc_auth_method_label(self):
+        sb = _Supabase({"jobs": [_stored_job()]})
+        settings = {
+            **_runtime_settings(),
+            "dfs_login": "login",
+            "dfs_password": "runtime-dfs-secret",
+        }
+        with (
+            patch.object(meta, "get_keyword_overview", return_value={}),
+            patch.object(meta, "get_keyword_difficulty", return_value={}),
+            patch.object(meta, "generate_copy", return_value={
+                "title": "Generated title",
+                "description": "Generated description",
+                "h1_optimised": "Generated H1",
+                "review_notes": "",
+            }),
+        ):
+            result = meta._process_single_row(
+                row={"url": "https://example.com/page", "keyword": "manual"},
+                settings=settings,
+                gsc_client=None,
+                gsc_auth_method="google_oauth",
+                branded_terms=[],
+                used_keywords=set(),
+                sb=sb,
+                job_id="job-1",
+                user_id="user-1",
+                row_num=1,
+                total_rows=1,
+            )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["gsc_auth_method"], "google_oauth")
+        self.assertNotIn("v1:runtime-ciphertext", repr(result))
 
 
 if __name__ == "__main__":
