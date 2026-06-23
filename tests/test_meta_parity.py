@@ -34,6 +34,41 @@ from utils import copy_gen
 
 
 class MetaPromptGuardrailTests(unittest.TestCase):
+    def test_openai_fallback_uses_current_gpt_5_model(self):
+        captured = {}
+
+        class FakeCompletions:
+            def create(self, **kwargs):
+                captured.update(kwargs)
+                return types.SimpleNamespace(
+                    choices=[
+                        types.SimpleNamespace(
+                            message=types.SimpleNamespace(
+                                content='{"title":"A","description":"B","h1_optimised":"C"}'
+                            )
+                        )
+                    ]
+                )
+
+        class FakeClient:
+            def __init__(self, api_key):
+                self.chat = types.SimpleNamespace(completions=FakeCompletions())
+
+        original_openai = copy_gen.openai.OpenAI
+        copy_gen.openai.OpenAI = FakeClient
+        try:
+            copy_gen.generate_copy_openai(
+                api_key="key",
+                url="https://example.com",
+                keyword="widgets",
+            )
+        finally:
+            copy_gen.openai.OpenAI = original_openai
+
+        self.assertEqual(captured["model"], "gpt-5.5")
+        self.assertEqual(captured["max_completion_tokens"], 512)
+        self.assertNotIn("max_tokens", captured)
+
     def test_prompt_includes_unsupported_claim_guardrail(self):
         prompt = copy_gen._build_prompt(
             copy_gen.DESCRIPTION_PROMPT,

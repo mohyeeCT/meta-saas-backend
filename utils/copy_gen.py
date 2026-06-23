@@ -353,12 +353,17 @@ def generate_copy_openai(api_key: str, url: str, keyword: str, page_type: str = 
                          brand_name: str = "", forbidden_phrases: str = "", context: str = "",
                          business_type: str = "general", h1: str = "", model: str = "") -> dict:
     client = openai.OpenAI(api_key=api_key)
-    _model = model or "gpt-4o-mini"
+    _model = model or "gpt-5.5"
+    token_limit = (
+        {"max_completion_tokens": 512}
+        if _model.startswith("gpt-5")
+        else {"max_tokens": 512}
+    )
 
     def call(template):
         resp = client.chat.completions.create(
             model=_model,
-            max_tokens=512,
+            **token_limit,
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1)}]
         )
         return resp.choices[0].message.content.strip()
