@@ -1,5 +1,51 @@
 import unittest
+import sys
+import types
 from unittest.mock import patch
+
+supabase_stub = types.ModuleType("supabase")
+supabase_stub.create_client = lambda *args, **kwargs: None
+supabase_stub.Client = object
+sys.modules.setdefault("supabase", supabase_stub)
+
+anthropic_stub = types.ModuleType("anthropic")
+anthropic_stub.Anthropic = object
+sys.modules.setdefault("anthropic", anthropic_stub)
+
+openai_stub = types.ModuleType("openai")
+openai_stub.OpenAI = object
+sys.modules.setdefault("openai", openai_stub)
+
+google_stub = types.ModuleType("google")
+google_genai_stub = types.ModuleType("google.genai")
+google_auth_stub = types.ModuleType("google.auth")
+google_auth_exceptions_stub = types.ModuleType("google.auth.exceptions")
+google_auth_exceptions_stub.RefreshError = RuntimeError
+google_stub.genai = google_genai_stub
+google_stub.auth = google_auth_stub
+google_auth_stub.exceptions = google_auth_exceptions_stub
+sys.modules.setdefault("google", google_stub)
+sys.modules.setdefault("google.genai", google_genai_stub)
+sys.modules.setdefault("google.auth", google_auth_stub)
+sys.modules.setdefault("google.auth.exceptions", google_auth_exceptions_stub)
+
+mistralai_stub = types.ModuleType("mistralai")
+mistralai_stub.Mistral = object
+sys.modules.setdefault("mistralai", mistralai_stub)
+
+groq_stub = types.ModuleType("groq")
+groq_stub.Groq = object
+sys.modules.setdefault("groq", groq_stub)
+
+gsc_stub = types.ModuleType("utils.gsc")
+gsc_stub.GscOAuthConfigError = RuntimeError
+gsc_stub.get_gsc_client = lambda *args, **kwargs: None
+gsc_stub.get_top_queries_for_url = lambda *args, **kwargs: []
+sys.modules.setdefault("utils.gsc", gsc_stub)
+
+copy_gen_stub = types.ModuleType("utils.copy_gen")
+copy_gen_stub.generate_copy = lambda *args, **kwargs: {}
+sys.modules.setdefault("utils.copy_gen", copy_gen_stub)
 
 from routers import meta
 
@@ -140,6 +186,51 @@ class MetaH1KeywordFallbackTests(unittest.TestCase):
         self.assertIsNone(result["selected_keyword"])
         self.assertNotEqual(result["keyword_source"], "h1 fallback")
         mock_generate.assert_not_called()
+
+    def test_generated_title_matching_h1_is_flagged_for_review(self):
+        result, _mock_generate = self._process({
+            "url": "https://example.com/emergency-plumbing",
+            "keyword": "emergency plumbing",
+            "page_type": "service",
+            "h1": "Emergency Plumbing Services",
+        })
+
+        self.assertEqual(result["status"], "review")
+        self.assertIn("Generated title matches the input H1.", result["qa_flags"])
+
+    def test_forbidden_phrase_in_meta_output_is_flagged_for_review(self):
+        def fake_copy():
+            return {
+                "title": "Emergency Plumbing Support",
+                "description": "Get cheap emergency plumbing support from trained specialists.",
+                "h1_optimised": "Emergency Plumbing Help",
+                "review_notes": "",
+            }
+
+        settings = _settings()
+        settings["forbidden_phrases"] = "cheap"
+        with patch.object(meta, "get_niche_context", return_value=""), \
+             patch.object(meta, "generate_copy", return_value=fake_copy()):
+            result = meta._process_single_row(
+                row={
+                    "url": "https://example.com/emergency-plumbing",
+                    "keyword": "emergency plumbing",
+                    "page_type": "service",
+                    "h1": "Emergency Plumbing Services",
+                },
+                settings=settings,
+                gsc_client=None,
+                branded_terms=[],
+                used_keywords=set(),
+                sb=_FakeSupabase(),
+                job_id="job-1",
+                user_id="user-1",
+                row_num=1,
+                total_rows=1,
+            )
+
+        self.assertEqual(result["status"], "review")
+        self.assertIn('Forbidden phrase found: "cheap".', result["qa_flags"])
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import re
 import time
 import uuid
 from datetime import datetime, timezone
@@ -30,6 +31,66 @@ _RATE_LIMITS = {
     "Mistral (free tier)": 2.0,
     "Groq (free tier)": 2.0,
 }
+
+_GENERIC_OPENERS = (
+    "Welcome to",
+    "Are you looking for",
+    "In today's world",
+    "Whether you are",
+    "Finding the right",
+    "When it comes to",
+    "Choosing the right",
+    "Looking for",
+    "There are many",
+    "It can be difficult to",
+    "If you are searching for",
+    "Whether you need",
+    "In the world of",
+)
+
+
+def _normalise_phrase(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip().lower())
+
+
+def _forbidden_phrases(settings: dict, brand_profile: dict | None = None) -> list:
+    phrases = []
+    phrases.extend(p.strip() for p in (settings.get("forbidden_phrases", "") or "").splitlines() if p.strip())
+    phrases.extend(p.strip() for p in ((brand_profile or {}).get("words_to_avoid", "") or "").splitlines() if p.strip())
+    return list(dict.fromkeys(phrases))
+
+
+def _meta_qa_flags(title: str, description: str, h1_opt: str, input_h1: str, forbidden_phrases: list) -> list:
+    flags = []
+    if not (title or "").strip():
+        flags.append("Missing meta title.")
+    elif len(title.strip()) < 10:
+        flags.append("Meta title is very short.")
+
+    if not (description or "").strip():
+        flags.append("Missing meta description.")
+    elif len(description.strip()) < 20:
+        flags.append("Meta description is very short.")
+
+    if not (h1_opt or "").strip():
+        flags.append("Missing optimised H1.")
+
+    if title and input_h1 and _normalise_phrase(title) == _normalise_phrase(input_h1):
+        flags.append("Generated title matches the input H1.")
+
+    output = _normalise_phrase(" ".join([title or "", description or "", h1_opt or ""]))
+    for phrase in forbidden_phrases:
+        if _normalise_phrase(phrase) and _normalise_phrase(phrase) in output:
+            flags.append(f'Forbidden phrase found: "{phrase}".')
+
+    first_sentence = re.split(r"[.!?]\s+", (description or "").strip(), maxsplit=1)[0]
+    normalised_first = _normalise_phrase(first_sentence)
+    for opener in _GENERIC_OPENERS:
+        if normalised_first.startswith(_normalise_phrase(opener)):
+            flags.append(f'Generic opener found: "{opener}".')
+            break
+
+    return flags
 
 
 def _safe_gsc_auth_method(settings: dict, gsc_credentials: dict | None, gsc_client=None) -> str:
@@ -285,6 +346,14 @@ def _process_single_row(
         description = copy.get("description", "")
         h1_opt      = copy.get("h1_optimised", "")
         review_notes = copy.get("review_notes", "")
+        qa_flags = _meta_qa_flags(
+            title,
+            description,
+            h1_opt,
+            h1,
+            _forbidden_phrases(settings, brand_profile),
+        )
+        row_status = "review" if qa_flags else "ok"
         step("✓ meta copy generated — title: " + str(len(title)) + " chars, desc: " + str(len(description)) + " chars")
 
         return {
@@ -303,7 +372,8 @@ def _process_single_row(
             "description_length":   len(description),
             "h1_length":            len(h1_opt),
             "review_notes":         review_notes,
-            "status":               "ok",
+            "qa_flags":             qa_flags,
+            "status":               row_status,
         }
     except Exception:
         step("Copy generation failed")
