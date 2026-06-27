@@ -279,6 +279,7 @@ def _process_single_row(
             business_type=settings.get("business_type", "general"),
             h1=h1,
             model=settings.get("model", ""),
+            runner_up_keyword=runner_up,
         )
         title       = copy.get("title", "")
         description = copy.get("description", "")

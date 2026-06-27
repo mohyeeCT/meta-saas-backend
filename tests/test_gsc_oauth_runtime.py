@@ -759,6 +759,53 @@ class RuntimePathTests(unittest.TestCase):
         self.assertIn("Always mention compliance.", context)
         self.assertNotIn("tone_of_voice", context)
 
+    def test_single_row_passes_runner_up_keyword_to_generation(self):
+        sb = _Supabase({"jobs": [_stored_job()]})
+        settings = {
+            **_runtime_settings(),
+            "dfs_login": "login",
+            "dfs_password": "runtime-dfs-secret",
+            "use_gsc": True,
+            "site_url": "https://example.com/",
+        }
+        gsc_queries = [
+            {"query": "primary widgets", "clicks": 10, "impressions": 100, "position": 3},
+            {"query": "secondary widgets", "clicks": 8, "impressions": 90, "position": 4},
+        ]
+        dfs_data = {
+            "primary widgets": {"volume": 100, "difficulty": 20},
+            "secondary widgets": {"volume": 80, "difficulty": 25},
+        }
+        with (
+            patch.object(meta, "get_top_queries_for_url", return_value=gsc_queries),
+            patch.object(meta, "get_keyword_overview", return_value=dfs_data),
+            patch.object(meta, "get_keyword_difficulty", return_value=dfs_data),
+            patch.object(meta, "generate_copy", return_value={
+                "title": "Generated title",
+                "description": "Generated description",
+                "h1_optimised": "Generated H1",
+                "review_notes": "",
+            }) as generate,
+        ):
+            result = meta._process_single_row(
+                row={"url": "https://example.com/page"},
+                settings=settings,
+                gsc_client=object(),
+                gsc_auth_method="google_oauth",
+                branded_terms=[],
+                used_keywords=set(),
+                sb=sb,
+                job_id="job-1",
+                user_id="user-1",
+                row_num=1,
+                total_rows=1,
+            )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["selected_keyword"], "primary widgets")
+        self.assertEqual(result["runner_up"], "secondary widgets")
+        self.assertEqual(generate.call_args.kwargs["runner_up_keyword"], "secondary widgets")
+
     def test_meta_settings_accept_page_scraping_fields(self):
         settings = JobSettings(scrape_pages=True, jina_api_key="runtime-jina-secret")
 

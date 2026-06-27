@@ -104,6 +104,24 @@ class MetaPromptGuardrailTests(unittest.TestCase):
         self.assertIn("aim for about 140 to 180 characters", prompt)
         self.assertNotIn("Count carefully. This is a strict limit.", prompt)
 
+    def test_prompt_includes_secondary_keyword_as_optional_signal(self):
+        prompt = copy_gen._build_prompt(
+            copy_gen.COPY_PROMPT,
+            url="https://example.com/products/widgets",
+            keyword="widgets",
+            page_type="category",
+            brand_name="Example",
+            forbidden_phrases="",
+            context="Product page context.",
+            business_type="ecommerce",
+            h1="Widgets",
+            runner_up_keyword="blue widgets",
+        )
+
+        self.assertIn("Secondary keyword variant: blue widgets", prompt)
+        self.assertIn("Use the secondary keyword only if it fits naturally", prompt)
+        self.assertIn("Do not force it", prompt)
+
     def test_generate_copy_uses_relaxed_title_and_description_lengths(self):
         original_provider = copy_gen.PROVIDERS.get("TestProvider")
         copy_gen.PROVIDERS["TestProvider"] = lambda api_key, **kwargs: {
@@ -124,6 +142,7 @@ class MetaPromptGuardrailTests(unittest.TestCase):
                 context="",
                 business_type="ecommerce",
                 h1="Widgets",
+                runner_up_keyword="blue widgets",
             )
         finally:
             if original_provider is None:
@@ -174,6 +193,7 @@ class MetaPromptGuardrailTests(unittest.TestCase):
                 context="",
                 business_type="ecommerce",
                 h1="Widgets",
+                runner_up_keyword="blue widgets",
             )
         finally:
             if original_provider is None:
@@ -183,6 +203,7 @@ class MetaPromptGuardrailTests(unittest.TestCase):
 
         self.assertEqual(len(calls), 1)
         self.assertEqual(result["review_notes"], "Review pricing claim before publishing.")
+        self.assertEqual(calls[0]["runner_up_keyword"], "blue widgets")
 
     def test_claude_provider_makes_one_structured_prompt_call(self):
         prompts = []
