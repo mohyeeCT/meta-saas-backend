@@ -700,6 +700,65 @@ class RuntimePathTests(unittest.TestCase):
         self.assertEqual(result["gsc_auth_method"], "google_oauth")
         self.assertNotIn("v1:runtime-ciphertext", repr(result))
 
+    def test_single_row_passes_full_brand_profile_context_to_generation(self):
+        sb = _Supabase({"jobs": [_stored_job()]})
+        settings = {
+            **_runtime_settings(),
+            "dfs_login": "login",
+            "dfs_password": "runtime-dfs-secret",
+        }
+        brand_profile = {
+            "brand_voice": "Plainspoken expert",
+            "tone": "Confident",
+            "target_audience": "Facilities managers",
+            "usps": "Same-day support",
+            "key_messages": "Reduce downtime",
+            "competitors": "Acme Rival",
+            "products_services": "Industrial dosing systems",
+            "words_to_avoid": "cheap",
+            "example_copy": "Existing brand sample.",
+            "guidelines": "Always mention compliance.",
+        }
+        with (
+            patch.object(meta, "get_keyword_overview", return_value={}),
+            patch.object(meta, "get_keyword_difficulty", return_value={}),
+            patch.object(meta, "generate_copy", return_value={
+                "title": "Generated title",
+                "description": "Generated description",
+                "h1_optimised": "Generated H1",
+                "review_notes": "",
+            }) as generate,
+        ):
+            result = meta._process_single_row(
+                row={"url": "https://example.com/page", "keyword": "manual"},
+                settings=settings,
+                gsc_client=None,
+                gsc_auth_method="disabled",
+                branded_terms=[],
+                used_keywords=set(),
+                sb=sb,
+                job_id="job-1",
+                user_id="user-1",
+                row_num=1,
+                total_rows=1,
+                brand_profile=brand_profile,
+            )
+
+        self.assertEqual(result["status"], "ok")
+        context = generate.call_args.kwargs["context"]
+        self.assertIn("Brand voice: Plainspoken expert", context)
+        self.assertIn("Tone: Confident", context)
+        self.assertIn("Target audience: Facilities managers", context)
+        self.assertIn("Unique selling points: Same-day support", context)
+        self.assertIn("Key messages to reinforce: Reduce downtime", context)
+        self.assertIn("Competitors (differentiate from): Acme Rival", context)
+        self.assertIn("Products/services: Industrial dosing systems", context)
+        self.assertIn("Words to avoid: cheap", context)
+        self.assertIn("Example copy to emulate in style (not content):", context)
+        self.assertIn("Existing brand sample.", context)
+        self.assertIn("Always mention compliance.", context)
+        self.assertNotIn("tone_of_voice", context)
+
     def test_meta_settings_accept_page_scraping_fields(self):
         settings = JobSettings(scrape_pages=True, jina_api_key="runtime-jina-secret")
 

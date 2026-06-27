@@ -69,6 +69,36 @@ def _update_job(sb, job_id: str, user_id: str, data: dict):
         pass
 
 
+def _build_brand_context(brand_profile: dict | None, niche: str = "") -> str:
+    parts = []
+    if brand_profile:
+        if brand_profile.get("brand_voice"):
+            parts.append("Brand voice: " + brand_profile["brand_voice"])
+        if brand_profile.get("tone"):
+            parts.append("Tone: " + brand_profile["tone"])
+        if brand_profile.get("target_audience"):
+            parts.append("Target audience: " + brand_profile["target_audience"])
+        if brand_profile.get("usps"):
+            parts.append("Unique selling points: " + brand_profile["usps"])
+        if brand_profile.get("key_messages"):
+            parts.append("Key messages to reinforce: " + brand_profile["key_messages"])
+        if brand_profile.get("competitors"):
+            parts.append("Competitors (differentiate from): " + brand_profile["competitors"])
+        if brand_profile.get("products_services"):
+            parts.append("Products/services: " + brand_profile["products_services"])
+        if brand_profile.get("words_to_avoid"):
+            parts.append("Words to avoid: " + brand_profile["words_to_avoid"])
+        if brand_profile.get("example_copy"):
+            parts.append("Example copy to emulate in style (not content):\n" + brand_profile["example_copy"])
+        if brand_profile.get("guidelines"):
+            parts.append(brand_profile["guidelines"])
+
+    niche_context = get_niche_context(niche)
+    if niche_context:
+        parts.append(niche_context)
+    return "\n".join(parts)
+
+
 def _process_single_row(
     row: dict,
     settings: dict,
@@ -218,22 +248,7 @@ def _process_single_row(
     # ── Generate copy ──────────────────────────────────────────────────────
     step("generating meta copy with " + settings.get("provider", "Claude") + "...")
 
-    brand_guidelines = ""
-    if brand_profile:
-        parts = []
-        if brand_profile.get("tone_of_voice"):
-            parts.append("Tone of voice: " + brand_profile["tone_of_voice"])
-        if brand_profile.get("key_messages"):
-            parts.append("Key messages: " + brand_profile["key_messages"])
-        if brand_profile.get("words_to_avoid"):
-            parts.append("Words to avoid: " + brand_profile["words_to_avoid"])
-        if brand_profile.get("guidelines"):
-            parts.append(brand_profile["guidelines"])
-        brand_guidelines = "\n".join(parts)
-
-    _niche_ctx = get_niche_context(settings.get("niche", ""))
-    if _niche_ctx:
-        brand_guidelines = (brand_guidelines + "\n\n" + _niche_ctx).strip()
+    brand_guidelines = _build_brand_context(brand_profile, settings.get("niche", ""))
 
     page_context = ""
     if settings.get("scrape_pages") and settings.get("jina_api_key"):
