@@ -745,19 +745,19 @@ class RuntimePathTests(unittest.TestCase):
             )
 
         self.assertEqual(result["status"], "ok")
-        context = generate.call_args.kwargs["context"]
-        self.assertIn("Brand voice: Plainspoken expert", context)
-        self.assertIn("Tone: Confident", context)
-        self.assertIn("Target audience: Facilities managers", context)
-        self.assertIn("Unique selling points: Same-day support", context)
-        self.assertIn("Key messages to reinforce: Reduce downtime", context)
-        self.assertIn("Competitors (differentiate from): Acme Rival", context)
-        self.assertIn("Products/services: Industrial dosing systems", context)
-        self.assertIn("Words to avoid: cheap", context)
-        self.assertIn("Example copy to emulate in style (not content):", context)
-        self.assertIn("Existing brand sample.", context)
-        self.assertIn("Always mention compliance.", context)
-        self.assertNotIn("tone_of_voice", context)
+        brand_context = generate.call_args.kwargs["brand_context"]
+        self.assertIn("BRAND CONTEXT:", brand_context)
+        self.assertIn("- Voice: Plainspoken expert", brand_context)
+        self.assertIn("- Tone: Confident", brand_context)
+        self.assertIn("- Target audience: Facilities managers", brand_context)
+        self.assertIn("- Unique selling points: Same-day support", brand_context)
+        self.assertIn("- Key messages to reinforce: Reduce downtime", brand_context)
+        self.assertIn("- Competitors to differentiate from: Acme Rival", brand_context)
+        self.assertIn("- Products/services: Industrial dosing systems", brand_context)
+        self.assertIn("- Words to avoid: cheap", brand_context)
+        self.assertIn("- Example copy to emulate in style, not content:\nExisting brand sample.", brand_context)
+        self.assertIn("- Additional brand guidelines:\nAlways mention compliance.", brand_context)
+        self.assertNotIn("tone_of_voice", brand_context)
 
     def test_single_row_passes_runner_up_keyword_to_generation(self):
         sb = _Supabase({"jobs": [_stored_job()]})

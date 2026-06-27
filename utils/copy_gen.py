@@ -293,6 +293,8 @@ Page details:
 - Forbidden phrases: {forbidden_phrases}
 - Additional context: {context}
 
+{brand_context}
+
 Use the secondary keyword only if it fits naturally, especially in the meta description. Do not force it or make the copy read like a keyword list.
 
 Review notes:
@@ -304,7 +306,7 @@ Review notes:
 def _build_prompt(template: str, url: str, keyword: str, page_type: str,
                   brand_name: str, forbidden_phrases: str, context: str,
                   business_type: str = "general", h1: str = "",
-                  runner_up_keyword: str = "") -> str:
+                  runner_up_keyword: str = "", brand_context: str = "") -> str:
     btype = business_type.lower().strip()
     bcontext = BUSINESS_TYPE_CONTEXT.get(btype, BUSINESS_TYPE_CONTEXT["general"])
     return template.format(
@@ -315,6 +317,7 @@ def _build_prompt(template: str, url: str, keyword: str, page_type: str,
         brand_name=brand_name or "N/A",
         forbidden_phrases=forbidden_phrases or "None",
         context=context or "None",
+        brand_context=brand_context or "BRAND CONTEXT:\nNone",
         h1=h1 or "Not provided",
         business_type=btype,
         buyer=bcontext["buyer"],
@@ -341,7 +344,8 @@ def _parse_copy_json(raw: str) -> dict:
 
 def _call_and_normalise(call_fn, url: str, keyword: str, page_type: str,
                         brand_name: str, forbidden_phrases: str, context: str,
-                        business_type: str, h1: str, runner_up_keyword: str = "") -> dict:
+                        business_type: str, h1: str, runner_up_keyword: str = "",
+                        brand_context: str = "") -> dict:
     prompt = _build_prompt(
         COPY_PROMPT,
         url=url,
@@ -353,6 +357,7 @@ def _call_and_normalise(call_fn, url: str, keyword: str, page_type: str,
         business_type=business_type,
         h1=h1,
         runner_up_keyword=runner_up_keyword,
+        brand_context=brand_context,
     )
     return _normalise_copy_result(_parse_copy_json(call_fn(prompt)), brand_name)
 
@@ -361,7 +366,7 @@ def _call_and_normalise(call_fn, url: str, keyword: str, page_type: str,
 def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = "general",
                          brand_name: str = "", forbidden_phrases: str = "", context: str = "",
                          business_type: str = "general", h1: str = "", model: str = "",
-                         runner_up_keyword: str = "") -> dict:
+                         runner_up_keyword: str = "", brand_context: str = "") -> dict:
     client = anthropic.Anthropic(api_key=api_key)
     _model = model or "claude-sonnet-4-20250514"
 
@@ -369,18 +374,18 @@ def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = 
         msg = client.messages.create(
             model=_model,
             max_tokens=512,
-            messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword)}]
+            messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)}]
         )
         return msg.content[0].text.strip()
 
-    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword)
+    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)
 
 
 # ── OpenAI ────────────────────────────────────────────────────────────────────
 def generate_copy_openai(api_key: str, url: str, keyword: str, page_type: str = "general",
                          brand_name: str = "", forbidden_phrases: str = "", context: str = "",
                          business_type: str = "general", h1: str = "", model: str = "",
-                         runner_up_keyword: str = "") -> dict:
+                         runner_up_keyword: str = "", brand_context: str = "") -> dict:
     client = openai.OpenAI(api_key=api_key)
     _model = model or "gpt-5.5"
     token_limit = (
@@ -393,36 +398,36 @@ def generate_copy_openai(api_key: str, url: str, keyword: str, page_type: str = 
         resp = client.chat.completions.create(
             model=_model,
             **token_limit,
-            messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword)}]
+            messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)}]
         )
         return resp.choices[0].message.content.strip()
 
-    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword)
+    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)
 
 
 # ── Gemini ────────────────────────────────────────────────────────────────────
 def generate_copy_gemini(api_key: str, url: str, keyword: str, page_type: str = "general",
                          brand_name: str = "", forbidden_phrases: str = "", context: str = "",
                          business_type: str = "general", h1: str = "", model: str = "",
-                         runner_up_keyword: str = "") -> dict:
+                         runner_up_keyword: str = "", brand_context: str = "") -> dict:
     client = google_genai.Client(api_key=api_key)
     _model = model or "gemini-2.0-flash"
 
     def call(template):
         resp = client.models.generate_content(
             model=_model,
-            contents=_build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword)
+            contents=_build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)
         )
         return resp.text.strip()
 
-    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword)
+    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)
 
 
 # ── Mistral ───────────────────────────────────────────────────────────────────
 def generate_copy_mistral(api_key: str, url: str, keyword: str, page_type: str = "general",
                           brand_name: str = "", forbidden_phrases: str = "", context: str = "",
                           business_type: str = "general", h1: str = "", model: str = "",
-                          runner_up_keyword: str = "") -> dict:
+                          runner_up_keyword: str = "", brand_context: str = "") -> dict:
     client = Mistral(api_key=api_key)
     _model = model or "mistral-small-latest"
 
@@ -430,18 +435,18 @@ def generate_copy_mistral(api_key: str, url: str, keyword: str, page_type: str =
         resp = client.chat.complete(
             model=_model,
             max_tokens=512,
-            messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword)}]
+            messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)}]
         )
         return resp.choices[0].message.content.strip()
 
-    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword)
+    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)
 
 
 # ── Groq ──────────────────────────────────────────────────────────────────────
 def generate_copy_groq(api_key: str, url: str, keyword: str, page_type: str = "general",
                        brand_name: str = "", forbidden_phrases: str = "", context: str = "",
                        business_type: str = "general", h1: str = "", model: str = "",
-                       runner_up_keyword: str = "") -> dict:
+                       runner_up_keyword: str = "", brand_context: str = "") -> dict:
     client = Groq(api_key=api_key)
     _model = model or "llama-3.1-8b-instant"
 
@@ -449,11 +454,11 @@ def generate_copy_groq(api_key: str, url: str, keyword: str, page_type: str = "g
         resp = client.chat.completions.create(
             model=_model,
             max_tokens=512,
-            messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword)}]
+            messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)}]
         )
         return resp.choices[0].message.content.strip()
 
-    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword)
+    return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)
 
 
 # ── Router ────────────────────────────────────────────────────────────────────

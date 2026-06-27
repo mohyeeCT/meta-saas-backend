@@ -127,32 +127,34 @@ def _update_job(sb, job_id: str, user_id: str, data: dict):
 
 
 def _build_brand_context(brand_profile: dict | None, niche: str = "") -> str:
-    parts = []
+    lines = []
     if brand_profile:
         if brand_profile.get("brand_voice"):
-            parts.append("Brand voice: " + brand_profile["brand_voice"])
-        if brand_profile.get("tone"):
-            parts.append("Tone: " + brand_profile["tone"])
+            lines.append("- Voice: " + brand_profile["brand_voice"])
+        tone = brand_profile.get("tone") or brand_profile.get("tone_of_voice")
+        if tone:
+            lines.append("- Tone: " + tone)
         if brand_profile.get("target_audience"):
-            parts.append("Target audience: " + brand_profile["target_audience"])
+            lines.append("- Target audience: " + brand_profile["target_audience"])
         if brand_profile.get("usps"):
-            parts.append("Unique selling points: " + brand_profile["usps"])
+            lines.append("- Unique selling points: " + brand_profile["usps"])
         if brand_profile.get("key_messages"):
-            parts.append("Key messages to reinforce: " + brand_profile["key_messages"])
+            lines.append("- Key messages to reinforce: " + brand_profile["key_messages"])
         if brand_profile.get("competitors"):
-            parts.append("Competitors (differentiate from): " + brand_profile["competitors"])
+            lines.append("- Competitors to differentiate from: " + brand_profile["competitors"])
         if brand_profile.get("products_services"):
-            parts.append("Products/services: " + brand_profile["products_services"])
+            lines.append("- Products/services: " + brand_profile["products_services"])
         if brand_profile.get("words_to_avoid"):
-            parts.append("Words to avoid: " + brand_profile["words_to_avoid"])
+            lines.append("- Words to avoid: " + brand_profile["words_to_avoid"])
         if brand_profile.get("example_copy"):
-            parts.append("Example copy to emulate in style (not content):\n" + brand_profile["example_copy"])
+            lines.append("- Example copy to emulate in style, not content:\n" + brand_profile["example_copy"])
         if brand_profile.get("guidelines"):
-            parts.append(brand_profile["guidelines"])
+            lines.append("- Additional brand guidelines:\n" + brand_profile["guidelines"])
 
+    parts = ["BRAND CONTEXT:\n" + "\n".join(lines)] if lines else []
     niche_context = get_niche_context(niche)
     if niche_context:
-        parts.append(niche_context)
+        parts.append("NICHE CONTEXT:\n" + niche_context)
     return "\n".join(parts)
 
 
@@ -305,7 +307,7 @@ def _process_single_row(
     # ── Generate copy ──────────────────────────────────────────────────────
     step("generating meta copy with " + settings.get("provider", "Claude") + "...")
 
-    brand_guidelines = _build_brand_context(brand_profile, settings.get("niche", ""))
+    brand_context = _build_brand_context(brand_profile, settings.get("niche", ""))
 
     page_context = ""
     if settings.get("scrape_pages") and settings.get("jina_api_key"):
@@ -319,8 +321,6 @@ def _process_single_row(
     context_parts = []
     if page_context:
         context_parts.append("SCRAPED PAGE CONTENT:\n" + page_context)
-    if brand_guidelines:
-        context_parts.append("BRAND/NICHE CONTEXT:\n" + brand_guidelines)
     copy_context = "\n\n".join(context_parts)
 
     try:
@@ -337,6 +337,7 @@ def _process_single_row(
             h1=h1,
             model=settings.get("model", ""),
             runner_up_keyword=runner_up,
+            brand_context=brand_context,
         )
         title       = copy.get("title", "")
         description = copy.get("description", "")

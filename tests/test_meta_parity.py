@@ -139,6 +139,31 @@ class MetaPromptGuardrailTests(unittest.TestCase):
         self.assertIn("Use the secondary keyword only if it fits naturally", prompt)
         self.assertIn("Do not force it", prompt)
 
+    def test_prompt_uses_structured_brand_context_block(self):
+        prompt = copy_gen._build_prompt(
+            copy_gen.COPY_PROMPT,
+            url="https://example.com/products/widgets",
+            keyword="widgets",
+            page_type="category",
+            brand_name="Example",
+            forbidden_phrases="",
+            context="Product page context.",
+            brand_context=(
+                "BRAND CONTEXT:\n"
+                "- Voice: Plainspoken expert\n"
+                "- Tone: Confident\n"
+                "- Target audience: Facilities managers"
+            ),
+            business_type="ecommerce",
+            h1="Widgets",
+        )
+
+        self.assertIn("BRAND CONTEXT:", prompt)
+        self.assertIn("- Voice: Plainspoken expert", prompt)
+        self.assertIn("- Tone: Confident", prompt)
+        self.assertIn("- Target audience: Facilities managers", prompt)
+        self.assertIn("Additional context: Product page context.", prompt)
+
     def test_generate_copy_preserves_long_copy_and_flags_soft_length_review(self):
         long_title = "This generated title is intentionally much longer than seventy characters so it keeps the brand CTA intact | Example"
         long_description = "This generated meta description is intentionally much longer than one hundred eighty characters so the normalisation layer must preserve the CTA, the differentiator, and the brand mention instead of silently cutting the ending."
