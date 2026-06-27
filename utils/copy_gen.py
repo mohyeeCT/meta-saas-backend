@@ -47,24 +47,36 @@ SOFT_TITLE_LIMIT = 80
 SOFT_DESCRIPTION_LIMIT = 180
 
 
-def _fit_to_limit(text: str, limit: int) -> str:
-    """Trim generated copy to a pragmatic upper bound without splitting words."""
-    text = (text or "").strip()
-    if len(text) <= limit:
-        return text
-
-    trimmed = text[:limit].rstrip()
-    if " " in trimmed:
-        trimmed = trimmed.rsplit(" ", 1)[0].rstrip()
-    return trimmed.rstrip(" ,;:-|")
+def _append_review_note(review_notes: str, note: str) -> str:
+    review_notes = (review_notes or "").strip()
+    if not note:
+        return review_notes
+    if not review_notes:
+        return note
+    if note in review_notes:
+        return review_notes
+    return review_notes.rstrip(".") + ". " + note
 
 
 def _normalise_copy_result(result: dict, brand_name: str = "") -> dict:
+    title = _sanitise(result.get("title", ""), brand_name)
+    description = _sanitise(result.get("description", ""), brand_name)
+    review_notes = _sanitise(result.get("review_notes", ""), brand_name)
+    if len(title) > SOFT_TITLE_LIMIT:
+        review_notes = _append_review_note(
+            review_notes,
+            f"Title is over {SOFT_TITLE_LIMIT} characters; review before publishing.",
+        )
+    if len(description) > SOFT_DESCRIPTION_LIMIT:
+        review_notes = _append_review_note(
+            review_notes,
+            f"Description is over {SOFT_DESCRIPTION_LIMIT} characters; review before publishing.",
+        )
     return {
-        "title": _fit_to_limit(_sanitise(result.get("title", ""), brand_name), SOFT_TITLE_LIMIT),
-        "description": _fit_to_limit(_sanitise(result.get("description", ""), brand_name), SOFT_DESCRIPTION_LIMIT),
+        "title": title,
+        "description": description,
         "h1_optimised": _sanitise(result.get("h1_optimised", ""), brand_name),
-        "review_notes": _sanitise(result.get("review_notes", ""), brand_name),
+        "review_notes": review_notes,
     }
 
 

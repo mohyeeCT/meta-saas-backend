@@ -122,11 +122,13 @@ class MetaPromptGuardrailTests(unittest.TestCase):
         self.assertIn("Use the secondary keyword only if it fits naturally", prompt)
         self.assertIn("Do not force it", prompt)
 
-    def test_generate_copy_uses_relaxed_title_and_description_lengths(self):
+    def test_generate_copy_preserves_long_copy_and_flags_soft_length_review(self):
+        long_title = "This generated title is intentionally much longer than seventy characters so it keeps the brand CTA intact | Example"
+        long_description = "This generated meta description is intentionally much longer than one hundred eighty characters so the normalisation layer must preserve the CTA, the differentiator, and the brand mention instead of silently cutting the ending."
         original_provider = copy_gen.PROVIDERS.get("TestProvider")
         copy_gen.PROVIDERS["TestProvider"] = lambda api_key, **kwargs: {
-            "title": "This generated title is intentionally much longer than seventy characters so that the normalisation layer has to shorten it safely.",
-            "description": "This generated meta description is intentionally much longer than one hundred seventy characters so that the normalisation layer trims it safely only when it clearly runs too long for a practical search snippet.",
+            "title": long_title,
+            "description": long_description,
             "h1_optimised": "Widgets for Example",
         }
 
@@ -150,9 +152,43 @@ class MetaPromptGuardrailTests(unittest.TestCase):
             else:
                 copy_gen.PROVIDERS["TestProvider"] = original_provider
 
-        self.assertLessEqual(len(result["title"]), 80)
-        self.assertLessEqual(len(result["description"]), 180)
+        self.assertEqual(result["title"], long_title)
+        self.assertEqual(result["description"], long_description)
         self.assertEqual(result["h1_optimised"], "Widgets for Example")
+        self.assertIn("Title is over 80 characters; review before publishing.", result["review_notes"])
+        self.assertIn("Description is over 180 characters; review before publishing.", result["review_notes"])
+
+    def test_length_review_notes_append_to_existing_notes(self):
+        original_provider = copy_gen.PROVIDERS.get("TestProvider")
+        copy_gen.PROVIDERS["TestProvider"] = lambda api_key, **kwargs: {
+            "title": "Short title",
+            "description": "This generated meta description is intentionally much longer than one hundred eighty characters so the existing review note remains visible and the long-description warning is added without trimming useful copy.",
+            "h1_optimised": "Widgets for Example",
+            "review_notes": "Review pricing claim before publishing.",
+        }
+
+        try:
+            result = copy_gen.generate_copy(
+                "TestProvider",
+                "key",
+                url="https://example.com",
+                keyword="widgets",
+                page_type="category",
+                brand_name="Example",
+                forbidden_phrases="",
+                context="",
+                business_type="ecommerce",
+                h1="Widgets",
+            )
+        finally:
+            if original_provider is None:
+                copy_gen.PROVIDERS.pop("TestProvider", None)
+            else:
+                copy_gen.PROVIDERS["TestProvider"] = original_provider
+
+        self.assertIn("Review pricing claim before publishing.", result["review_notes"])
+        self.assertIn("Description is over 180 characters; review before publishing.", result["review_notes"])
+        self.assertNotIn("Title is over 80 characters", result["review_notes"])
 
     def test_parse_copy_json_strips_fences_and_requires_object(self):
         parsed = copy_gen._parse_copy_json(
