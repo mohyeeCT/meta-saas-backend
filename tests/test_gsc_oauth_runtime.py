@@ -700,6 +700,94 @@ class RuntimePathTests(unittest.TestCase):
         self.assertEqual(result["gsc_auth_method"], "google_oauth")
         self.assertNotIn("v1:runtime-ciphertext", repr(result))
 
+    def test_meta_settings_accept_page_scraping_fields(self):
+        settings = JobSettings(scrape_pages=True, jina_api_key="runtime-jina-secret")
+
+        dumped = settings.model_dump()
+
+        self.assertTrue(dumped["scrape_pages"])
+        self.assertEqual(dumped["jina_api_key"], "runtime-jina-secret")
+
+    def test_single_row_uses_scraped_page_content_when_enabled(self):
+        sb = _Supabase({"jobs": [_stored_job()]})
+        settings = {
+            **_runtime_settings(),
+            "dfs_login": "login",
+            "dfs_password": "runtime-dfs-secret",
+            "scrape_pages": True,
+            "jina_api_key": "runtime-jina-secret",
+        }
+        with (
+            patch.object(meta, "get_keyword_overview", return_value={}),
+            patch.object(meta, "get_keyword_difficulty", return_value={}),
+            patch.object(meta, "scrape_page_context", return_value={
+                "success": True,
+                "content": "Unique product details from the live page.",
+            }) as scrape,
+            patch.object(meta, "generate_copy", return_value={
+                "title": "Generated title",
+                "description": "Generated description",
+                "h1_optimised": "Generated H1",
+                "review_notes": "",
+            }) as generate,
+        ):
+            result = meta._process_single_row(
+                row={"url": "https://example.com/page", "keyword": "manual"},
+                settings=settings,
+                gsc_client=None,
+                gsc_auth_method="disabled",
+                branded_terms=[],
+                used_keywords=set(),
+                sb=sb,
+                job_id="job-1",
+                user_id="user-1",
+                row_num=1,
+                total_rows=1,
+            )
+
+        self.assertEqual(result["status"], "ok")
+        scrape.assert_called_once_with("runtime-jina-secret", "https://example.com/page", max_chars=10000)
+        context = generate.call_args.kwargs["context"]
+        self.assertIn("SCRAPED PAGE CONTENT:", context)
+        self.assertIn("Unique product details from the live page.", context)
+
+    def test_single_row_continues_when_page_scrape_fails(self):
+        sb = _Supabase({"jobs": [_stored_job()]})
+        settings = {
+            **_runtime_settings(),
+            "dfs_login": "login",
+            "dfs_password": "runtime-dfs-secret",
+            "scrape_pages": True,
+            "jina_api_key": "runtime-jina-secret",
+        }
+        with (
+            patch.object(meta, "get_keyword_overview", return_value={}),
+            patch.object(meta, "get_keyword_difficulty", return_value={}),
+            patch.object(meta, "scrape_page_context", side_effect=TimeoutError("read timed out")),
+            patch.object(meta, "generate_copy", return_value={
+                "title": "Generated title",
+                "description": "Generated description",
+                "h1_optimised": "Generated H1",
+                "review_notes": "",
+            }) as generate,
+        ):
+            result = meta._process_single_row(
+                row={"url": "https://example.com/page", "keyword": "manual"},
+                settings=settings,
+                gsc_client=None,
+                gsc_auth_method="disabled",
+                branded_terms=[],
+                used_keywords=set(),
+                sb=sb,
+                job_id="job-1",
+                user_id="user-1",
+                row_num=1,
+                total_rows=1,
+            )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertNotIn("SCRAPED PAGE CONTENT:", generate.call_args.kwargs["context"])
+
 
 if __name__ == "__main__":
     unittest.main()

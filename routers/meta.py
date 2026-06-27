@@ -14,6 +14,7 @@ from utils.dfs import get_keyword_overview, get_keyword_difficulty
 from utils.keyword import select_keyword
 from utils.niches import get_niche_context
 from utils.copy_gen import generate_copy
+from utils.scraper import scrape_page_context
 
 router = APIRouter()
 
@@ -234,6 +235,22 @@ def _process_single_row(
     if _niche_ctx:
         brand_guidelines = (brand_guidelines + "\n\n" + _niche_ctx).strip()
 
+    page_context = ""
+    if settings.get("scrape_pages") and settings.get("jina_api_key"):
+        try:
+            scrape_result = scrape_page_context(settings["jina_api_key"], url, max_chars=10000)
+            if scrape_result.get("success") and scrape_result.get("content"):
+                page_context = scrape_result["content"]
+        except Exception:
+            page_context = ""
+
+    context_parts = []
+    if page_context:
+        context_parts.append("SCRAPED PAGE CONTENT:\n" + page_context)
+    if brand_guidelines:
+        context_parts.append("BRAND/NICHE CONTEXT:\n" + brand_guidelines)
+    copy_context = "\n\n".join(context_parts)
+
     try:
         copy = generate_copy(
             provider=settings.get("provider", "Claude"),
@@ -243,7 +260,7 @@ def _process_single_row(
             page_type=page_type,
             brand_name=settings.get("brand_name", "") if settings.get("include_brand", True) else "",
             forbidden_phrases=settings.get("forbidden_phrases", ""),
-            context=brand_guidelines,
+            context=copy_context,
             business_type=settings.get("business_type", "general"),
             h1=h1,
             model=settings.get("model", ""),
@@ -427,6 +444,8 @@ class MetaSettings(BaseModel):
     min_volume: int = 10
     use_gsc: bool = True
     site_url: str = ""
+    scrape_pages: bool = False
+    jina_api_key: str = ""
     brand_profile_id: str = ""
     restricted_industry: bool = False
     model: str = ""
