@@ -64,13 +64,9 @@ def _meta_qa_flags(title: str, description: str, h1_opt: str, input_h1: str, for
     flags = []
     if not (title or "").strip():
         flags.append("Missing meta title.")
-    elif len(title.strip()) < 10:
-        flags.append("Meta title is very short.")
 
     if not (description or "").strip():
         flags.append("Missing meta description.")
-    elif len(description.strip()) < 20:
-        flags.append("Meta description is very short.")
 
     if not (h1_opt or "").strip():
         flags.append("Missing optimised H1.")

@@ -232,6 +232,17 @@ class MetaH1KeywordFallbackTests(unittest.TestCase):
         self.assertEqual(result["status"], "review")
         self.assertIn('Forbidden phrase found: "cheap".', result["qa_flags"])
 
+    def test_short_present_title_and_description_are_not_flagged_for_review(self):
+        flags = meta._meta_qa_flags(
+            title="Sale",
+            description="Book now.",
+            h1_opt="Emergency Plumbing Help",
+            input_h1="Emergency Plumbing Services",
+            forbidden_phrases=[],
+        )
+
+        self.assertEqual(flags, [])
+
 
 if __name__ == "__main__":
     unittest.main()

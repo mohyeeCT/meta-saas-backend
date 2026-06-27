@@ -43,8 +43,8 @@ Unsupported claim guardrail:
   unsupported specifics.
 """.strip()
 
-SOFT_TITLE_LIMIT = 80
-SOFT_DESCRIPTION_LIMIT = 180
+SOFT_TITLE_LIMIT = 90
+SOFT_DESCRIPTION_LIMIT = 200
 
 
 def _append_review_note(review_notes: str, note: str) -> str:
@@ -144,7 +144,7 @@ TITLE_PROMPT = """You are a senior SEO copywriter with deep knowledge of how dif
 Write a title tag for the following page.
 
 Hard rules:
-- Aim for about 50 to 80 characters.
+- Aim for up to 90 characters.
 - Prioritise a strong, natural title over mechanically forcing the old 60-character limit.
 - Include the target keyword naturally, ideally near the start
 - No all-caps, excessive punctuation, or clickbait
@@ -183,7 +183,7 @@ DESCRIPTION_PROMPT = """You are a senior SEO copywriter with deep knowledge of h
 Write a meta description for the following page.
 
 Hard rules:
-- Aim for about 140 to 180 characters.
+- Aim for up to 200 characters.
 - Prioritise a clear, persuasive description over mechanically forcing the old 155-character limit.
 - Include the target keyword naturally
 - Do not duplicate the title tag
@@ -222,7 +222,7 @@ Important: The H1 tells you the current page topic. Use it to write a descriptio
 H1_PROMPT = """You are a senior SEO copywriter. Write an optimised H1 tag for the following page.
 
 Hard rules:
-- No hard character limit but aim for under 70 characters
+- No hard character limit but aim for under 80 characters
 - Include the target keyword naturally, ideally near the start
 - Do NOT include the brand name (H1 is on-page copy, brand is not needed)
 - No all-caps, excessive punctuation, or clickbait
@@ -258,10 +258,10 @@ COPY_PROMPT = """You are a senior SEO copywriter with deep knowledge of how diff
 Write one title tag, one meta description, and one optimised H1 for the following page.
 
 Hard rules:
-- Title should aim for about 50 to 80 characters.
-- Meta description should aim for about 140 to 180 characters.
+- Title should aim for up to 90 characters.
+- Meta description should aim for up to 200 characters.
 - Prioritise strong, natural copy over mechanically forcing the old 60/155-character limits.
-- H1 has no hard character limit but should aim for under 70 characters.
+- H1 has no hard character limit but should aim for under 80 characters.
 - Include the target keyword naturally, ideally near the start where it fits.
 - No all-caps, excessive punctuation, or clickbait.
 - No padding or filler words.

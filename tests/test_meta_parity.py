@@ -116,8 +116,9 @@ class MetaPromptGuardrailTests(unittest.TestCase):
             h1="Widgets",
         )
 
-        self.assertIn("aim for about 50 to 80 characters", prompt)
-        self.assertIn("aim for about 140 to 180 characters", prompt)
+        self.assertIn("aim for up to 90 characters", prompt)
+        self.assertIn("aim for up to 200 characters", prompt)
+        self.assertIn("H1 has no hard character limit but should aim for under 80 characters", prompt)
         self.assertNotIn("Count carefully. This is a strict limit.", prompt)
 
     def test_prompt_includes_secondary_keyword_as_optional_signal(self):
@@ -171,8 +172,8 @@ class MetaPromptGuardrailTests(unittest.TestCase):
         self.assertEqual(result["title"], long_title)
         self.assertEqual(result["description"], long_description)
         self.assertEqual(result["h1_optimised"], "Widgets for Example")
-        self.assertIn("Title is over 80 characters; review before publishing.", result["review_notes"])
-        self.assertIn("Description is over 180 characters; review before publishing.", result["review_notes"])
+        self.assertIn("Title is over 90 characters; review before publishing.", result["review_notes"])
+        self.assertIn("Description is over 200 characters; review before publishing.", result["review_notes"])
 
     def test_length_review_notes_append_to_existing_notes(self):
         original_provider = copy_gen.PROVIDERS.get("TestProvider")
@@ -203,8 +204,8 @@ class MetaPromptGuardrailTests(unittest.TestCase):
                 copy_gen.PROVIDERS["TestProvider"] = original_provider
 
         self.assertIn("Review pricing claim before publishing.", result["review_notes"])
-        self.assertIn("Description is over 180 characters; review before publishing.", result["review_notes"])
-        self.assertNotIn("Title is over 80 characters", result["review_notes"])
+        self.assertIn("Description is over 200 characters; review before publishing.", result["review_notes"])
+        self.assertNotIn("Title is over 90 characters", result["review_notes"])
 
     def test_parse_copy_json_strips_fences_and_requires_object(self):
         parsed = copy_gen._parse_copy_json(
