@@ -87,6 +87,22 @@ class MetaPromptGuardrailTests(unittest.TestCase):
         self.assertIn("availability", prompt)
         self.assertIn("strategy signals", prompt)
 
+    def test_ecommerce_cta_examples_do_not_suggest_unverified_shipping_claims(self):
+        prompt = copy_gen._build_prompt(
+            copy_gen.COPY_PROMPT,
+            url="https://example.com/products/widgets",
+            keyword="widgets",
+            page_type="category",
+            brand_name="Example",
+            forbidden_phrases="",
+            context="Product page context.",
+            business_type="ecommerce",
+            h1="Widgets",
+        )
+
+        self.assertIn("Shop now, Browse the collection, Order today", prompt)
+        self.assertNotIn("Free shipping", prompt)
+
     def test_prompt_uses_relaxed_length_guidance(self):
         prompt = copy_gen._build_prompt(
             copy_gen.COPY_PROMPT,

@@ -104,7 +104,7 @@ BUSINESS_TYPE_CONTEXT = {
         "buyer": "online shoppers",
         "intent": "browsing products, comparing options, ready to buy",
         "tone": "punchy, benefit-focused, conversion-oriented",
-        "cta_examples": "Shop now, Browse the collection, Order today, Free shipping",
+        "cta_examples": "Shop now, Browse the collection, Order today, Explore the range",
         "avoid": "vague descriptions with no product specifics",
         "title_pattern": "product name or category first, include a differentiator if space allows, end with brand",
         "desc_pattern": "lead with the product, include a key benefit, end with action-oriented CTA"
