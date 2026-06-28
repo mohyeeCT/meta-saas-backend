@@ -330,10 +330,10 @@ def cancel_job(job_id: str, user=Depends(get_current_user), sb=Depends(get_supab
     if res.data[0]["status"] != "running":
         raise HTTPException(status_code=400, detail=f"Job is not running (status: {res.data[0]['status']})")
     sb.table("jobs").update({
-        "status": "cancelling",
-        "current_step": "Cancelling — stopping after current row...",
+        "status": "cancelled",
+        "current_step": "Cancelled — stopping after current row...",
     }).eq("id", job_id).eq("user_id", user.id).execute()
-    return {"cancelling": True}
+    return {"cancelled": True}
 
 
 @router.post("/{job_id}/rerun-rows")
