@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 SECRET_FIELDS = frozenset({
     "api_key",
+    "api_keys",
     "dfs_password",
     "jina_api_key",
     "gsc_service_account",
@@ -20,6 +21,15 @@ def split_provider_settings(settings: dict | None) -> tuple[dict, dict]:
     safe = strip_secret_fields(settings)
     secrets = {key: value for key, value in (settings or {}).items() if key in SECRET_FIELDS and value not in (None, "")}
     return safe, secrets
+
+
+def get_provider_api_key(provider_settings: dict | None, provider: str | None = None) -> str:
+    settings = provider_settings or {}
+    provider_name = (provider or settings.get("provider") or "").strip()
+    api_keys = settings.get("api_keys") or {}
+    if provider_name and isinstance(api_keys, dict) and api_keys.get(provider_name):
+        return api_keys[provider_name]
+    return settings.get("api_key", "") or ""
 
 
 def _read_row(sb, table: str, user_id: str, allow_missing_schema: bool = False) -> dict:
@@ -71,7 +81,10 @@ def hydrate_job_settings(sb, user_id: str, settings: dict | None) -> dict:
     hydrated = strip_secret_fields(settings)
     credentials = load_user_credentials(sb, user_id)
     stored = credentials.get("provider_settings") or {}
-    for key in {"api_key", "dfs_password", "jina_api_key"}:
+    api_key = get_provider_api_key(stored, hydrated.get("provider") or stored.get("provider"))
+    if api_key:
+        hydrated["api_key"] = api_key
+    for key in {"dfs_password", "jina_api_key"}:
         if stored.get(key):
             hydrated[key] = stored[key]
     active = load_active_gsc_credentials(sb, user_id)
