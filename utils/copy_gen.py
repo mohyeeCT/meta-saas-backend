@@ -6,6 +6,9 @@ from mistralai import Mistral
 from groq import Groq
 
 
+META_MAX_TOKENS = 8192
+
+
 def _sanitise(text: str, brand_name: str = "") -> str:
     """
     Post-process AI output to enforce hard formatting rules
@@ -375,6 +378,13 @@ def _extract_anthropic_text(content) -> str:
     return text
 
 
+def _anthropic_request_options(model: str, max_tokens: int) -> dict:
+    options = {"model": model, "max_tokens": max_tokens}
+    if (model or "").startswith("claude-sonnet-5"):
+        options["thinking"] = {"type": "disabled"}
+    return options
+
+
 def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = "general",
                          brand_name: str = "", forbidden_phrases: str = "", context: str = "",
                          business_type: str = "general", h1: str = "", model: str = "",
@@ -384,8 +394,7 @@ def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = 
 
     def call(template):
         msg = client.messages.create(
-            model=_model,
-            max_tokens=512,
+            **_anthropic_request_options(_model, META_MAX_TOKENS),
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)}]
         )
         return _extract_anthropic_text(msg.content)
@@ -401,9 +410,9 @@ def generate_copy_openai(api_key: str, url: str, keyword: str, page_type: str = 
     client = openai.OpenAI(api_key=api_key)
     _model = model or "gpt-5.5"
     token_limit = (
-        {"max_completion_tokens": 512}
+        {"max_completion_tokens": META_MAX_TOKENS}
         if _model.startswith("gpt-5")
-        else {"max_tokens": 512}
+        else {"max_tokens": META_MAX_TOKENS}
     )
 
     def call(template):
@@ -446,7 +455,7 @@ def generate_copy_mistral(api_key: str, url: str, keyword: str, page_type: str =
     def call(template):
         resp = client.chat.complete(
             model=_model,
-            max_tokens=512,
+            max_tokens=META_MAX_TOKENS,
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)}]
         )
         return resp.choices[0].message.content.strip()
@@ -465,7 +474,7 @@ def generate_copy_groq(api_key: str, url: str, keyword: str, page_type: str = "g
     def call(template):
         resp = client.chat.completions.create(
             model=_model,
-            max_tokens=512,
+            max_tokens=META_MAX_TOKENS,
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)}]
         )
         return resp.choices[0].message.content.strip()

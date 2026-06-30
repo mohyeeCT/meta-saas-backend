@@ -66,7 +66,7 @@ class MetaPromptGuardrailTests(unittest.TestCase):
             copy_gen.openai.OpenAI = original_openai
 
         self.assertEqual(captured["model"], "gpt-5.5")
-        self.assertEqual(captured["max_completion_tokens"], 512)
+        self.assertEqual(captured["max_completion_tokens"], copy_gen.META_MAX_TOKENS)
         self.assertNotIn("max_tokens", captured)
 
     def test_prompt_includes_unsupported_claim_guardrail(self):
@@ -285,6 +285,7 @@ class MetaPromptGuardrailTests(unittest.TestCase):
 
     def test_claude_provider_makes_one_structured_prompt_call(self):
         prompts = []
+        request_options = []
 
         class FakeMessage:
             content = [types.SimpleNamespace(text='{"title":"A","description":"B","h1_optimised":"C","review_notes":"D"}')]
@@ -292,6 +293,7 @@ class MetaPromptGuardrailTests(unittest.TestCase):
         class FakeMessages:
             def create(self, **kwargs):
                 prompts.append(kwargs["messages"][0]["content"])
+                request_options.append(kwargs)
                 return FakeMessage()
 
         class FakeAnthropic:
@@ -317,7 +319,14 @@ class MetaPromptGuardrailTests(unittest.TestCase):
 
         self.assertEqual(len(prompts), 1)
         self.assertIn("Return ONLY a raw JSON object", prompts[0])
+        self.assertEqual(request_options[0]["max_tokens"], copy_gen.META_MAX_TOKENS)
+        self.assertEqual(request_options[0]["thinking"], {"type": "disabled"})
         self.assertEqual(result["review_notes"], "D")
+
+    def test_non_sonnet_5_claude_request_leaves_thinking_unset(self):
+        options = copy_gen._anthropic_request_options("claude-sonnet-4-6", 2048)
+
+        self.assertNotIn("thinking", options)
 
 
 if __name__ == "__main__":
