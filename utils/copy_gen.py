@@ -363,6 +363,18 @@ def _call_and_normalise(call_fn, url: str, keyword: str, page_type: str,
 
 
 # ── Claude ────────────────────────────────────────────────────────────────────
+def _extract_anthropic_text(content) -> str:
+    """Return concatenated text blocks from an Anthropic Messages response."""
+    text = "\n".join(
+        str(block.text)
+        for block in (content or [])
+        if getattr(block, "type", "text") == "text" and getattr(block, "text", None)
+    ).strip()
+    if not text:
+        raise RuntimeError("AI provider returned an empty text response")
+    return text
+
+
 def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = "general",
                          brand_name: str = "", forbidden_phrases: str = "", context: str = "",
                          business_type: str = "general", h1: str = "", model: str = "",
@@ -376,7 +388,7 @@ def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = 
             max_tokens=512,
             messages=[{"role": "user", "content": _build_prompt(template, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)}]
         )
-        return msg.content[0].text.strip()
+        return _extract_anthropic_text(msg.content)
 
     return _call_and_normalise(call, url, keyword, page_type, brand_name, forbidden_phrases, context, business_type, h1, runner_up_keyword, brand_context)
 
