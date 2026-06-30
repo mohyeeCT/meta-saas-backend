@@ -245,6 +245,14 @@ class MetaPromptGuardrailTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             copy_gen._parse_copy_json('["not", "an", "object"]')
 
+    def test_parse_copy_json_extracts_object_from_wrapped_response(self):
+        parsed = copy_gen._parse_copy_json(
+            'Here is the metadata:\n{"title":"A","description":"B","h1_optimised":"C","review_notes":""}\nDone.'
+        )
+
+        self.assertEqual(parsed["title"], "A")
+        self.assertEqual(parsed["description"], "B")
+
     def test_generate_copy_uses_single_structured_provider_call_and_returns_review_notes(self):
         calls = []
 
@@ -320,11 +328,11 @@ class MetaPromptGuardrailTests(unittest.TestCase):
         self.assertEqual(len(prompts), 1)
         self.assertIn("Return ONLY a raw JSON object", prompts[0])
         self.assertEqual(request_options[0]["max_tokens"], copy_gen.META_MAX_TOKENS)
-        self.assertEqual(request_options[0]["thinking"], {"type": "disabled"})
+        self.assertNotIn("thinking", request_options[0])
         self.assertEqual(result["review_notes"], "D")
 
-    def test_non_sonnet_5_claude_request_leaves_thinking_unset(self):
-        options = copy_gen._anthropic_request_options("claude-sonnet-4-6", 2048)
+    def test_claude_request_leaves_thinking_unset(self):
+        options = copy_gen._anthropic_request_options("claude-sonnet-5", 2048)
 
         self.assertNotIn("thinking", options)
 

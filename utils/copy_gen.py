@@ -339,7 +339,14 @@ def _parse_copy_json(raw: str) -> dict:
     import re
     raw = re.sub(r"^```(?:json)?\s*", "", raw)
     raw = re.sub(r"\s*```\s*$", "", raw)
-    data = json.loads(raw)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            raise
+        data = json.loads(raw[start:end + 1])
     if not isinstance(data, dict):
         raise ValueError("AI response must be a JSON object")
     return data
@@ -379,10 +386,7 @@ def _extract_anthropic_text(content) -> str:
 
 
 def _anthropic_request_options(model: str, max_tokens: int) -> dict:
-    options = {"model": model, "max_tokens": max_tokens}
-    if (model or "").startswith("claude-sonnet-5"):
-        options["thinking"] = {"type": "disabled"}
-    return options
+    return {"model": model, "max_tokens": max_tokens}
 
 
 def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = "general",
