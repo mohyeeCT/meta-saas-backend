@@ -368,7 +368,7 @@ def generate_copy_claude(api_key: str, url: str, keyword: str, page_type: str = 
                          business_type: str = "general", h1: str = "", model: str = "",
                          runner_up_keyword: str = "", brand_context: str = "") -> dict:
     client = anthropic.Anthropic(api_key=api_key)
-    _model = model or "claude-sonnet-4-20250514"
+    _model = model or "claude-sonnet-5"
 
     def call(template):
         msg = client.messages.create(
