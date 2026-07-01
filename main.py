@@ -1,6 +1,24 @@
-from fastapi import FastAPI
+import re
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
 from routers import meta, jobs, settings
+
+_ALLOWED_ORIGINS = {
+    "https://copypilot.app",
+    "https://meta.copypilot.app",
+    "https://meta-saas-frontend.vercel.app",
+}
+_ALLOWED_ORIGIN_RE = re.compile(
+    r"https://copypilot-platform(?:-[a-z0-9-]+)?-mohyeects-projects\.vercel\.app"
+)
+
+
+def _is_allowed_origin(origin: str | None) -> bool:
+    return bool(origin and (origin in _ALLOWED_ORIGINS or _ALLOWED_ORIGIN_RE.fullmatch(origin)))
+
 
 app = FastAPI(
     title="Meta Copy Production API",
@@ -10,12 +28,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://copypilot.app",
-        "https://meta.copypilot.app",
-        "https://meta-saas-frontend.vercel.app",
-    ],
-    allow_origin_regex=r"https://copypilot-platform(?:-[a-z0-9-]+)?-mohyeects-projects\.vercel\.app",
+    allow_origins=list(_ALLOWED_ORIGINS),
+    allow_origin_regex=_ALLOWED_ORIGIN_RE.pattern,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,20 +45,18 @@ def health():
     return {"status": "ok"}
 
 
-from fastapi import Request
-from fastapi.responses import JSONResponse
-
-
 @app.exception_handler(Exception)
 async def _global_exception_handler(request: Request, exc: Exception):
-    """Inject CORS headers on unhandled 500s.
-    Railway EU edge strips CORS from 500 responses, causing misleading
-    CORS errors in DevTools that mask the real server error."""
+    """Inject safe CORS headers on unhandled 500s for known CopyPilot origins."""
+    headers = {}
+    origin = request.headers.get("origin")
+    if _is_allowed_origin(origin):
+        headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+        }
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc)},
-        headers={
-            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
-            "Access-Control-Allow-Credentials": "true",
-        },
+        content={"detail": "Internal server error"},
+        headers=headers,
     )
