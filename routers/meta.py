@@ -16,6 +16,7 @@ from utils.keyword import select_keyword
 from utils.niches import get_niche_context
 from utils.copy_gen import generate_copy
 from utils.scraper import scrape_page_context
+from utils.page_types import normalize_page_type
 
 router = APIRouter()
 
@@ -179,7 +180,7 @@ def _process_single_row(
     manual_kw    = (row.get("keyword") or "").strip()
     h1_raw       = (row.get("h1") or "").strip()
     h1           = "" if h1_raw.lower() == "none" else h1_raw
-    page_type    = row.get("page_type") or "general"
+    page_type    = normalize_page_type(row.get("page_type"), default="general")
 
     def _empty(status: str) -> dict:
         return {
