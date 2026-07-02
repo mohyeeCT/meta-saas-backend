@@ -5,7 +5,7 @@ See `../CLAUDE.md` for full platform context, conventions, and working rules.
 ## What This Repo Is
 
 FastAPI backend for the Meta Copy workflow.
-Deployed on Railway EU West. Default branch: `main`. Current HEAD: `8cb284b`.
+Deployed on Railway EU West. Default branch: `main`. Current HEAD: `c446341`.
 Runtime: Python 3.12.
 
 Railway URL: `https://meta-saas-backend-production.up.railway.app`
@@ -52,6 +52,10 @@ Same shared set as FAQ with POST /api/meta/run as the tool endpoint.
 8. Sanitise all three outputs
 9. Write to Supabase
 
+Manual keyword rule: row-level manual keywords are explicit user input and
+should stay the primary choice when present. GSC/DFS/H1 fallback should fill
+gaps, not override manual intent.
+
 ## Generation Approach
 
 Single structured JSON call per row. The AI returns one object with all three
@@ -63,6 +67,10 @@ niche, business_type, provider, model, brand_name, include_brand,
 forbidden_phrases, brand_profile_id, restricted_industry
 
 ## Known Gotchas
+
+- `landing_page` is distinct from service pages. Service landing page aliases
+  normalize to service behavior; plain landing-page aliases normalize to
+  `landing_page`.
 
 - Niche context goes into brand_guidelines (not page_context — Meta has no scraping).
 - Parse AI JSON with try/except. Strip markdown fences before json.loads.
