@@ -84,7 +84,7 @@ def select_keyword(
                     sc = math.log1p(impressions) * clicks_boost * ctr_boost * pos_score * rel_score
                 else:
                     # Standard: apply 0.1 penalty so these rank below volume-bearing keywords
-                    sc = math.log1p(impressions) * ctr_boost * 0.1
+                    sc = math.log1p(impressions) * ctr_boost * pos_score * rel_score * 0.1
                 candidates.append({
                     "keyword": query,
                     "score": round(sc, 4),

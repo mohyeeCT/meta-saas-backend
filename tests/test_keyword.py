@@ -67,6 +67,42 @@ class KeywordSelectionTests(unittest.TestCase):
                          "Zero-volume keyword must still be selectable when it is the only candidate")
         self.assertFalse(result["fallback_triggered"])
 
+    def test_standard_zero_volume_scoring_uses_position_and_relevance(self):
+        queries = [
+            {
+                "query": "emergency plumbing services",
+                "impressions": 40,
+                "clicks": 1,
+                "ctr": 0.02,
+                "position": 2.0,
+            },
+            {
+                "query": "random celebrity quote",
+                "impressions": 500,
+                "clicks": 10,
+                "ctr": 0.02,
+                "position": 45.0,
+            },
+        ]
+        dfs_data = {
+            "emergency plumbing services": {"volume": 0, "difficulty": 50},
+            "random celebrity quote": {"volume": 0, "difficulty": 50},
+        }
+
+        result = select_keyword(
+            queries,
+            dfs_data,
+            branded_terms=[],
+            h1="Emergency Plumbing Services",
+            restricted_industry=False,
+        )
+
+        self.assertEqual(result["selected_keyword"], "emergency plumbing services")
+        self.assertGreater(
+            result["selected_keyword_data"]["score"],
+            result["runner_up"]["score"],
+        )
+
     # ── min_volume filter ─────────────────────────────────────────────────────
 
     def test_standard_mode_applies_min_volume_filter(self):
