@@ -2,6 +2,7 @@ import re
 import time
 import uuid
 from datetime import datetime, timezone
+from typing import Literal
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from google.auth.exceptions import RefreshError
 from pydantic import BaseModel
@@ -32,6 +33,44 @@ _RATE_LIMITS = {
     "Mistral (free tier)": 2.0,
     "Groq (free tier)": 2.0,
 }
+
+
+def _scrape_page_for_settings(settings: dict, url: str, scraper_override: str = "") -> dict:
+    firecrawl_key = settings.get("firecrawl_api_key", "")
+    if scraper_override == "firecrawl" or settings.get("scrape_provider", "jina") == "firecrawl":
+        from utils.scraper import scrape_page_context_firecrawl
+        return scrape_page_context_firecrawl(firecrawl_key, url, max_chars=10000)
+
+    jina_result = None
+    jina_key = settings.get("jina_api_key", "")
+    if jina_key:
+        jina_result = scrape_page_context(jina_key, url, max_chars=10000)
+        if jina_result.get("success") or not settings.get("firecrawl_fallback"):
+            return jina_result
+    elif not settings.get("firecrawl_fallback"):
+        return {"content": "", "title": "", "success": False, "error": "Jina API key is not configured."}
+
+    if not firecrawl_key:
+        return jina_result or {
+            "content": "",
+            "title": "",
+            "success": False,
+            "error": "Firecrawl API key is not configured.",
+        }
+    from utils.scraper import scrape_page_context_firecrawl
+    firecrawl_result = scrape_page_context_firecrawl(firecrawl_key, url, max_chars=10000)
+    if not firecrawl_result.get("success") and jina_result is not None:
+        firecrawl_result["error"] = f"Jina failed; {firecrawl_result.get('error') or 'Firecrawl could not scrape this page.'}"
+    return firecrawl_result
+
+
+def _scraper_available(settings: dict, scraper_override: str = "") -> bool:
+    if scraper_override == "firecrawl" or settings.get("scrape_provider", "jina") == "firecrawl":
+        return bool(settings.get("firecrawl_api_key"))
+    return bool(
+        settings.get("jina_api_key")
+        or (settings.get("firecrawl_fallback") and settings.get("firecrawl_api_key"))
+    )
 
 _GENERIC_OPENERS = (
     "Welcome to",
@@ -172,6 +211,7 @@ def _process_single_row(
     total_rows: int,
     brand_profile: dict = None,
     gsc_auth_method: str = "disabled",
+    scraper_override: str = "",
 ) -> dict:
     def step(msg: str):
         _update_job(sb, job_id, user_id, {"current_step": f"Row {row_num}/{total_rows}: {msg}"})
@@ -181,6 +221,7 @@ def _process_single_row(
     h1_raw       = (row.get("h1") or "").strip()
     h1           = "" if h1_raw.lower() == "none" else h1_raw
     page_type    = normalize_page_type(row.get("page_type"), default="general")
+    scrape_status = "skipped"
 
     def _empty(status: str) -> dict:
         return {
@@ -191,6 +232,7 @@ def _process_single_row(
             "optimised_h1": None, "title_length": None,
             "description_length": None, "h1_length": None,
             "review_notes": "",
+            "scrape_status": scrape_status,
             "status": status,
         }
 
@@ -311,13 +353,18 @@ def _process_single_row(
     brand_context = _build_brand_context(brand_profile, settings.get("niche", ""))
 
     page_context = ""
-    if settings.get("scrape_pages") and settings.get("jina_api_key"):
+    if settings.get("scrape_pages") and _scraper_available(settings, scraper_override):
         try:
-            scrape_result = scrape_page_context(settings["jina_api_key"], url, max_chars=10000)
+            scrape_result = _scrape_page_for_settings(settings, url, scraper_override=scraper_override)
             if scrape_result.get("success") and scrape_result.get("content"):
                 page_context = scrape_result["content"]
+                source = scrape_result.get("source") or "live"
+                scrape_status = f"ok [{source}] ({len(page_context)} chars)"
+            else:
+                scrape_status = f"failed: {scrape_result.get('error', 'unknown')[:160]}"
         except Exception:
             page_context = ""
+            scrape_status = "failed: Page scraping failed unexpectedly."
 
     context_parts = []
     if page_context:
@@ -370,6 +417,7 @@ def _process_single_row(
             "description_length":   len(description),
             "h1_length":            len(h1_opt),
             "review_notes":         review_notes,
+            "scrape_status":        scrape_status,
             "qa_flags":             qa_flags,
             "status":               row_status,
         }
@@ -530,6 +578,8 @@ class MetaSettings(BaseModel):
     site_url: str = ""
     scrape_pages: bool = False
     jina_api_key: str = ""
+    scrape_provider: Literal["jina", "firecrawl"] = "jina"
+    firecrawl_fallback: bool = False
     brand_profile_id: str = ""
     restricted_industry: bool = False
     model: str = ""
@@ -560,6 +610,15 @@ def run_meta_job(
         ) from None
     if not runtime_settings.get("api_key") or not runtime_settings.get("dfs_password"):
         raise HTTPException(status_code=400, detail="Saved provider credentials are incomplete. Update Settings and try again.")
+    if (
+        request.settings.scrape_pages
+        and request.settings.scrape_provider == "firecrawl"
+        and not runtime_settings.get("firecrawl_api_key")
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Add a Firecrawl API key in Settings before using Firecrawl as the primary scraper.",
+        )
 
     gsc_credentials = None
     if request.settings.use_gsc:

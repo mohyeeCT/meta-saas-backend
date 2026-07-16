@@ -6,6 +6,7 @@ SECRET_FIELDS = frozenset({
     "api_keys",
     "dfs_password",
     "jina_api_key",
+    "firecrawl_api_key",
     "gsc_service_account",
     "_gsc_credentials",
     "_gsc_service_account",
@@ -84,7 +85,7 @@ def hydrate_job_settings(sb, user_id: str, settings: dict | None) -> dict:
     api_key = get_provider_api_key(stored, hydrated.get("provider") or stored.get("provider"))
     if api_key:
         hydrated["api_key"] = api_key
-    for key in {"dfs_password", "jina_api_key"}:
+    for key in {"dfs_password", "jina_api_key", "firecrawl_api_key"}:
         if stored.get(key):
             hydrated[key] = stored[key]
     active = load_active_gsc_credentials(sb, user_id)

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Literal, Optional
 
 
 class JobRow(BaseModel):
@@ -36,6 +36,8 @@ class JobSettings(BaseModel):
     # Scraping
     jina_api_key: str = ""
     scrape_pages: bool = True
+    scrape_provider: Literal["jina", "firecrawl"] = "jina"
+    firecrawl_fallback: bool = False
 
     # GSC
     use_gsc: bool = True

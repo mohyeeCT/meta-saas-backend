@@ -216,17 +216,21 @@ class CredentialSelectionTests(unittest.TestCase):
             load_user_credentials(_Supabase(tables), "user-1")
 
     def test_hydration_strips_all_incoming_secrets_then_uses_server_selection(self):
+        tables = _tables("service_account")
+        tables["user_credentials"][0]["provider_settings"]["firecrawl_api_key"] = "runtime-firecrawl-secret"
         incoming = {
             "provider": "Claude",
             "api_key": "attacker-api",
             "dfs_password": "attacker-dfs",
             "jina_api_key": "attacker-jina",
+            "firecrawl_api_key": "attacker-firecrawl",
             "_gsc_service_account": {"private_key": "attacker-key"},
             "_gsc_credentials": {"method": "google_oauth", "refresh_token_ciphertext": "attacker-token"},
         }
-        hydrated = hydrate_job_settings(_Supabase(_tables("service_account")), "user-1", incoming)
+        hydrated = hydrate_job_settings(_Supabase(tables), "user-1", incoming)
         self.assertEqual(hydrated["_gsc_credentials"], SERVICE_ACCOUNT)
         self.assertEqual(hydrated["api_key"], "runtime-api-secret")
+        self.assertEqual(hydrated["firecrawl_api_key"], "runtime-firecrawl-secret")
         self.assertNotIn("_gsc_service_account", hydrated)
         self.assertNotIn("attacker", repr(hydrated))
 
