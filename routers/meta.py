@@ -626,17 +626,20 @@ def run_meta_job(
 
     # Fetch brand profile
     brand_profile = None
+    client_profile_id = None
     if request.settings.brand_profile_id:
         try:
             bp_res = sb.table("brand_profiles").select("data").eq("id", request.settings.brand_profile_id).eq("user_id", user.id).execute()
             if bp_res.data:
                 brand_profile = bp_res.data[0].get("data") or {}
+                client_profile_id = request.settings.brand_profile_id
         except Exception:
             pass
 
     execute_active_job_write(lambda: sb.table("jobs").insert({
         "id":            job_id,
         "user_id":       user.id,
+        "client_profile_id": client_profile_id,
         "name":          request.name or f"Meta job {len(request.rows)} URLs",
         "tool":          "meta",
         "status":        "pending",

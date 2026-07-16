@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
+from datetime import datetime, timezone
 from auth import get_current_user, get_supabase
 from credentials import clear_server_credential_field, load_user_credentials, save_server_credentials, split_provider_settings, strip_secret_fields
 
@@ -215,9 +216,12 @@ class BrandProfileUpdate(BaseModel):
 
 
 @router.get("/brand-profiles")
-def list_brand_profiles(user=Depends(get_current_user)):
+def list_brand_profiles(include_archived: bool = False, user=Depends(get_current_user)):
     sb = get_supabase()
-    res = sb.table("brand_profiles").select("*").eq("user_id", user.id).order("created_at", desc=False).execute()
+    query = sb.table("brand_profiles").select("*").eq("user_id", user.id)
+    if not include_archived:
+        query = query.is_("archived_at", "null")
+    res = query.order("created_at", desc=False).execute()
     return res.data or []
 
 
@@ -249,8 +253,13 @@ def update_brand_profile(profile_id: str, body: BrandProfileUpdate, user=Depends
 @router.delete("/brand-profiles/{profile_id}")
 def delete_brand_profile(profile_id: str, user=Depends(get_current_user)):
     sb = get_supabase()
+    linked = sb.table("jobs").select("id").eq("user_id", user.id).eq("client_profile_id", profile_id).limit(1).execute()
+    if linked.data:
+        timestamp = datetime.now(timezone.utc).isoformat()
+        sb.table("brand_profiles").update({"archived_at": timestamp, "updated_at": timestamp}).eq("id", profile_id).eq("user_id", user.id).execute()
+        return {"deleted": True, "archived": True}
     sb.table("brand_profiles").delete().eq("id", profile_id).eq("user_id", user.id).execute()
-    return {"deleted": True}
+    return {"deleted": True, "archived": False}
 
 
 @router.get("/niches")

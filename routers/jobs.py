@@ -36,18 +36,24 @@ def rename_job(job_id: str, body: RenameRequest, user=Depends(get_current_user))
 
 
 @router.get("")
-def list_jobs(user=Depends(get_current_user)):
+def list_jobs(
+    client_profile_id: str | None = None,
+    unassigned: bool = False,
+    user=Depends(get_current_user),
+):
     """Return all jobs for the current user, newest first."""
     sb = get_supabase()
-    res = (
+    query = (
         sb.table("jobs")
-        .select("id, name, status, total_rows, completed_rows, failed_rows, created_at, updated_at, error")
+        .select("id, name, status, total_rows, completed_rows, failed_rows, client_profile_id, created_at, updated_at, error")
         .eq("user_id", user.id)
         .eq("tool", "meta")
-        .order("created_at", desc=True)
-        .limit(50)
-        .execute()
     )
+    if client_profile_id:
+        query = query.eq("client_profile_id", client_profile_id)
+    elif unassigned:
+        query = query.is_("client_profile_id", "null")
+    res = query.order("created_at", desc=True).limit(50).execute()
     return res.data or []
 
 
@@ -521,6 +527,7 @@ def duplicate_job(
 
     new_job = {
         "user_id": user.id,
+        "client_profile_id": original.get("client_profile_id"),
         "status": "draft",
         "name": f"{original.get('name', 'Job')} (copy)",
         "settings": strip_secret_fields(original.get("settings")),

@@ -10,6 +10,7 @@
 create table if not exists public.jobs (
   id             uuid primary key default gen_random_uuid(),
   user_id        uuid references auth.users not null,
+  client_profile_id uuid,
   created_at     timestamptz default now(),
   updated_at     timestamptz default now(),
   status         text default 'pending'
@@ -127,8 +128,10 @@ create table if not exists public.brand_profiles (
   user_id    uuid references auth.users not null,
   name       text not null,
   data       jsonb default '{}',
+  archived_at timestamptz,
   created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  constraint brand_profiles_id_user_id_key unique (id, user_id)
 );
 
 alter table public.brand_profiles enable row level security;
@@ -147,6 +150,23 @@ do $$ begin
 end $$;
 
 create index if not exists brand_profiles_user_id_idx on public.brand_profiles (user_id);
+
+do $$ begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.jobs'::regclass
+      and conname = 'jobs_client_profile_user_fk'
+  ) then
+    alter table public.jobs
+      add constraint jobs_client_profile_user_fk
+      foreign key (client_profile_id, user_id)
+      references public.brand_profiles (id, user_id)
+      on delete restrict;
+  end if;
+end $$;
+
+create index if not exists jobs_client_profile_idx
+  on public.jobs (user_id, client_profile_id, tool, created_at desc);
 
 
 -- ── Job templates ─────────────────────────────────────────────────────────────
@@ -185,6 +205,7 @@ create index if not exists job_templates_user_id_idx on public.job_templates (us
 create table if not exists public.indexer_jobs (
   id             uuid primary key default gen_random_uuid(),
   user_id        uuid references auth.users not null,
+  client_profile_id uuid,
   status         text default 'running',
   name           text,
   settings       jsonb default '{}',
@@ -197,7 +218,11 @@ create table if not exists public.indexer_jobs (
   current_step   text default '',
   error          text,
   created_at     timestamptz default now(),
-  updated_at     timestamptz default now()
+  updated_at     timestamptz default now(),
+  constraint indexer_jobs_client_profile_user_fk
+    foreign key (client_profile_id, user_id)
+    references public.brand_profiles (id, user_id)
+    on delete restrict
 );
 
 alter table public.indexer_jobs enable row level security;
@@ -216,6 +241,8 @@ do $$ begin
 end $$;
 
 create index if not exists indexer_jobs_user_id_idx on public.indexer_jobs (user_id);
+create index if not exists indexer_jobs_client_profile_idx
+  on public.indexer_jobs (user_id, client_profile_id, created_at desc);
 
 
 -- ── Indexer quota ─────────────────────────────────────────────────────────────
