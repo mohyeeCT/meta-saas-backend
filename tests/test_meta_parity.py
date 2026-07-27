@@ -34,6 +34,28 @@ from utils import copy_gen
 
 
 class MetaPromptGuardrailTests(unittest.TestCase):
+    def test_all_metadata_prompts_require_us_english(self):
+        for template in (
+            copy_gen.TITLE_PROMPT,
+            copy_gen.DESCRIPTION_PROMPT,
+            copy_gen.H1_PROMPT,
+            copy_gen.COPY_PROMPT,
+        ):
+            prompt = copy_gen._build_prompt(
+                template,
+                url="https://example.com/products/widgets",
+                keyword="widgets",
+                page_type="category",
+                brand_name="Example",
+                forbidden_phrases="",
+                context="A UK source uses colour and prioritise.",
+                business_type="ecommerce",
+                h1="Widgets",
+            )
+            self.assertIn("U.S. ENGLISH REQUIREMENT", prompt)
+            self.assertIn("Do not imitate British spelling", prompt)
+            self.assertIn("Preserve official brand and product names", prompt)
+
     def test_openai_fallback_uses_current_gpt_5_model(self):
         captured = {}
 

@@ -5,6 +5,8 @@ from google import genai as google_genai
 from mistralai import Mistral
 from groq import Groq
 
+from utils.language import US_ENGLISH_OUTPUT_RULE
+
 
 META_MAX_TOKENS = 8192
 
@@ -147,8 +149,9 @@ TITLE_PROMPT = """You are a senior SEO copywriter with deep knowledge of how dif
 Write a title tag for the following page.
 
 Hard rules:
+{us_english_output_rule}
 - Aim for up to 90 characters.
-- Prioritise a strong, natural title over mechanically forcing the old 60-character limit.
+- Prioritize a strong, natural title over mechanically forcing the old 60-character limit.
 - Include the target keyword naturally, ideally near the start
 - No all-caps, excessive punctuation, or clickbait
 - No padding or filler words
@@ -186,8 +189,9 @@ DESCRIPTION_PROMPT = """You are a senior SEO copywriter with deep knowledge of h
 Write a meta description for the following page.
 
 Hard rules:
+{us_english_output_rule}
 - Aim for up to 200 characters.
-- Prioritise a clear, persuasive description over mechanically forcing the old 155-character limit.
+- Prioritize a clear, persuasive description over mechanically forcing the old 155-character limit.
 - Include the target keyword naturally
 - Do not duplicate the title tag
 - No all-caps, excessive punctuation, or clickbait
@@ -222,9 +226,10 @@ Important: The H1 tells you the current page topic. Use it to write a descriptio
 
 
 
-H1_PROMPT = """You are a senior SEO copywriter. Write an optimised H1 tag for the following page.
+H1_PROMPT = """You are a senior SEO copywriter. Write an optimized H1 tag for the following page.
 
 Hard rules:
+{us_english_output_rule}
 - No hard character limit but aim for under 80 characters
 - Include the target keyword naturally, ideally near the start
 - Do NOT include the brand name (H1 is on-page copy, brand is not needed)
@@ -258,12 +263,13 @@ Important: The current H1 shows what topic the page covers. Your job is to impro
 
 COPY_PROMPT = """You are a senior SEO copywriter with deep knowledge of how different business types require different copy strategies.
 
-Write one title tag, one meta description, and one optimised H1 for the following page.
+Write one title tag, one meta description, and one optimized H1 for the following page.
 
 Hard rules:
+{us_english_output_rule}
 - Title should aim for up to 90 characters.
 - Meta description should aim for up to 200 characters.
-- Prioritise strong, natural copy over mechanically forcing the old 60/155-character limits.
+- Prioritize strong, natural copy over mechanically forcing the old 60/155-character limits.
 - H1 has no hard character limit but should aim for under 80 characters.
 - Include the target keyword naturally, ideally near the start where it fits.
 - No all-caps, excessive punctuation, or clickbait.
@@ -331,6 +337,7 @@ def _build_prompt(template: str, url: str, keyword: str, page_type: str,
         title_pattern=bcontext["title_pattern"],
         desc_pattern=bcontext["desc_pattern"],
         unsupported_claim_guardrail=UNSUPPORTED_CLAIM_GUARDRAIL,
+        us_english_output_rule=US_ENGLISH_OUTPUT_RULE,
     )
 
 

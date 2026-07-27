@@ -14,6 +14,7 @@ from credentials import hydrate_job_settings, mark_gsc_reconnect_required, strip
 from utils.gsc import GscOAuthConfigError, get_gsc_client, get_top_queries_for_url
 from utils.dfs import get_keyword_overview, get_keyword_difficulty
 from utils.keyword import select_keyword
+from utils.language import find_non_us_english_spellings
 from utils.niches import get_niche_context
 from utils.copy_gen import generate_copy
 from utils.scraper import scrape_page_context
@@ -100,7 +101,14 @@ def _forbidden_phrases(settings: dict, brand_profile: dict | None = None) -> lis
     return list(dict.fromkeys(phrases))
 
 
-def _meta_qa_flags(title: str, description: str, h1_opt: str, input_h1: str, forbidden_phrases: list) -> list:
+def _meta_qa_flags(
+    title: str,
+    description: str,
+    h1_opt: str,
+    input_h1: str,
+    forbidden_phrases: list,
+    protected_phrases: list[str] | None = None,
+) -> list:
     flags = []
     if not (title or "").strip():
         flags.append("Missing meta title.")
@@ -109,7 +117,7 @@ def _meta_qa_flags(title: str, description: str, h1_opt: str, input_h1: str, for
         flags.append("Missing meta description.")
 
     if not (h1_opt or "").strip():
-        flags.append("Missing optimised H1.")
+        flags.append("Missing optimized H1.")
 
     if title and input_h1 and _normalise_phrase(title) == _normalise_phrase(input_h1):
         flags.append("Generated title matches the input H1.")
@@ -125,6 +133,17 @@ def _meta_qa_flags(title: str, description: str, h1_opt: str, input_h1: str, for
         if normalised_first.startswith(_normalise_phrase(opener)):
             flags.append(f'Generic opener found: "{opener}".')
             break
+
+    non_us_spellings = find_non_us_english_spellings(
+        " ".join([title or "", description or "", h1_opt or ""]),
+        protected_phrases or [],
+    )
+    if non_us_spellings:
+        flags.append(
+            "Non-U.S. English spelling detected: "
+            + ", ".join(non_us_spellings[:5])
+            + ". Use U.S. English."
+        )
 
     return flags
 
@@ -397,6 +416,7 @@ def _process_single_row(
             h1_opt,
             h1,
             _forbidden_phrases(settings, brand_profile),
+            [settings.get("brand_name", ""), h1],
         )
         row_status = "review" if qa_flags else "ok"
         step("✓ meta copy generated — title: " + str(len(title)) + " chars, desc: " + str(len(description)) + " chars")

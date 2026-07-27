@@ -243,6 +243,41 @@ class MetaH1KeywordFallbackTests(unittest.TestCase):
 
         self.assertEqual(flags, [])
 
+    def test_qa_flags_non_us_spelling_but_protects_official_names(self):
+        flags = meta._meta_qa_flags(
+            title="Optimised Services",
+            description="Compare colour options from an organisation that prioritises clarity.",
+            h1_opt="Organised Service Support",
+            input_h1="Service Support",
+            forbidden_phrases=[],
+        )
+        self.assertTrue(
+            any(flag.startswith("Non-U.S. English spelling detected:") for flag in flags)
+        )
+
+        protected_flags = meta._meta_qa_flags(
+            title="Colour Centre",
+            description="Explore the official Colour Centre service and its supported options.",
+            h1_opt="Colour Centre",
+            input_h1="Colour Centre",
+            forbidden_phrases=[],
+            protected_phrases=["Colour Centre"],
+        )
+        self.assertFalse(
+            any(flag.startswith("Non-U.S. English spelling detected:") for flag in protected_flags)
+        )
+
+        valid_us_flags = meta._meta_qa_flags(
+            title="Fulfilled Orders",
+            description="See how orders are fulfilled by a fulfilling support team.",
+            h1_opt="Order Support",
+            input_h1="Order Support",
+            forbidden_phrases=[],
+        )
+        self.assertFalse(
+            any(flag.startswith("Non-U.S. English spelling detected:") for flag in valid_us_flags)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
